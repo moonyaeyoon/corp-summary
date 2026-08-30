@@ -3,6 +3,7 @@
 import { exportSummaryAsExcel } from "@/lib/report-export";
 import {
   createReport,
+  createSqlGuide,
   getDashboardOverview,
   getReportDetail,
   getReportSummary,
@@ -12,8 +13,11 @@ import {
   type DetailColumn,
   type Report,
   type ReportSummary,
+  type SqlGuideResponse,
 } from "@/lib/reports-api";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { DatePicker } from "./date-picker";
 import { Icon } from "./icon";
 import { DataList, MainTabs, OverviewPanel } from "./report-tables";
@@ -75,16 +79,18 @@ function Sidebar({
   isReportsExpanded,
   onCreateClick,
   onDashboardClick,
+  onQuestionsClick,
   onReportsClick,
   onSelectReport,
   onToggleReports,
   reports,
   selectedReportId,
 }: {
-  activeView: "dashboard" | "reports" | "report";
+  activeView: "dashboard" | "reports" | "report" | "questions";
   isReportsExpanded: boolean;
   onCreateClick: () => void;
   onDashboardClick: () => void;
+  onQuestionsClick: () => void;
   onReportsClick: () => void;
   onSelectReport: (report: Report) => void;
   onToggleReports: () => void;
@@ -106,7 +112,7 @@ function Sidebar({
         <div className="sidebar-group">
           <div className="sidebar-group-title">
             <button
-              className={activeView !== "dashboard" ? "sidebar-link active" : "sidebar-link"}
+              className={activeView === "reports" || activeView === "report" ? "sidebar-link active" : "sidebar-link"}
               onClick={onReportsClick}
               type="button"
             >
@@ -143,6 +149,15 @@ function Sidebar({
             </div>
           ) : null}
         </div>
+
+        <button
+          className={activeView === "questions" ? "sidebar-link active" : "sidebar-link"}
+          onClick={onQuestionsClick}
+          type="button"
+        >
+          <Icon name="questions" size={24} />
+          <span>Questions</span>
+        </button>
       </nav>
     </aside>
   );
@@ -403,6 +418,183 @@ function ReportsListPanel({
   );
 }
 
+function buildSqlGuideText(response: SqlGuideResponse): string {
+  return [
+    response.answer,
+    response.queryResult?.executedSql || response.sql
+      ? ["", "SQL:", response.queryResult?.executedSql ?? response.sql].join("\n")
+      : "",
+    response.queryResult?.executed
+      ? ["", "조회 결과:", JSON.stringify(response.queryResult.rows, null, 2)].join("\n")
+      : "",
+    response.usedTables.length > 0 ? ["", "사용 테이블:", response.usedTables.join(", ")].join("\n") : "",
+    response.cautions.length > 0 ? ["", "주의사항:", ...response.cautions.map((item) => `- ${item}`)].join("\n") : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function copyText(text: string, onCopied: () => void) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  }
+
+  onCopied();
+}
+
+function QuestionsPanel({
+  answer,
+  errorMessage,
+  isSubmitting,
+  onCopied,
+  onQuestionChange,
+  onSubmit,
+  question,
+}: {
+  answer: SqlGuideResponse | null;
+  errorMessage: string | null;
+  isSubmitting: boolean;
+  onCopied: () => void;
+  onQuestionChange: (value: string) => void;
+  onSubmit: () => Promise<void>;
+  question: string;
+}) {
+  const fullAnswerText = answer ? buildSqlGuideText(answer) : "";
+  const displayedSql = answer?.queryResult?.executedSql ?? answer?.sql;
+
+  return (
+    <section className="questions-panel">
+      <h2>데이터 Q&A</h2>
+      <form
+        className="question-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit();
+        }}
+      >
+        <label htmlFor="question-input">질문</label>
+        <textarea
+          id="question-input"
+          maxLength={2000}
+          onChange={(event) => onQuestionChange(event.target.value)}
+          placeholder="법인 데이터에 대해 질문해 주세요. 예) 8월 27일 기준 예치금이 가장 많은 법인 10개 보여줘"
+          value={question}
+        />
+        <button className="primary-button question-submit-button" disabled={!question.trim() || isSubmitting} type="submit">
+          {isSubmitting ? "질문 중" : "질문하기"}
+        </button>
+      </form>
+
+      <div className="answer-heading">
+        <h3>답변</h3>
+        {answer ? (
+          <button
+            className="icon-button"
+            onClick={() => void copyText(fullAnswerText, onCopied)}
+            title="답변 전체 복사"
+            type="button"
+          >
+            <Icon name="copy" />
+          </button>
+        ) : null}
+      </div>
+      <div className="answer-area">
+        {isSubmitting ? (
+          <p className="answer-placeholder">답변을 생성하는 중입니다.</p>
+        ) : answer ? (
+          <div className="answer-content">
+            <p>{answer.answer}</p>
+            {displayedSql ? (
+              <div className="code-block-wrap">
+                <div className="code-block-toolbar">
+                  <span>SQL</span>
+                  <button
+                    className="icon-button"
+                    onClick={() => void copyText(displayedSql, onCopied)}
+                    title="SQL 복사"
+                    type="button"
+                  >
+                    <Icon name="copy" />
+                  </button>
+                </div>
+                <SyntaxHighlighter
+                  customStyle={{
+                    background: "transparent",
+                    margin: 0,
+                    padding: "16px",
+                  }}
+                  language="sql"
+                  style={oneLight}
+                >
+                  {displayedSql}
+                </SyntaxHighlighter>
+              </div>
+            ) : null}
+            {answer.queryResult?.executed ? <QueryResultPreview queryResult={answer.queryResult} /> : null}
+            {answer.usedTables.length > 0 ? (
+              <div className="answer-meta">
+                <strong>사용 테이블</strong>
+                <span>{answer.usedTables.join(", ")}</span>
+              </div>
+            ) : null}
+            {answer.cautions.length > 0 || !answer.isSafeSelect ? (
+              <div className="answer-meta">
+                <strong>주의사항</strong>
+                {answer.isSafeSelect ? null : <span>생성된 SQL이 조회 전용인지 한 번 더 확인해 주세요.</span>}
+                {answer.cautions.map((caution) => (
+                  <span key={caution}>{caution}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="answer-placeholder">질문하면 이곳에 답변이 표시됩니다.</p>
+        )}
+      </div>
+      {errorMessage ? <p className="status-message error">{errorMessage}</p> : null}
+    </section>
+  );
+}
+
+function QueryResultPreview({
+  queryResult,
+}: {
+  queryResult: NonNullable<SqlGuideResponse["queryResult"]>;
+}) {
+  return (
+    <div className="query-result-preview">
+      <div className="query-result-heading">
+        <strong>조회 결과</strong>
+        <span>{queryResult.rowCount.toLocaleString("ko-KR")}건</span>
+      </div>
+      {queryResult.rows.length > 0 && queryResult.columns.length > 0 ? (
+        <div className="query-result-scroll">
+          <table>
+            <thead>
+              <tr>
+                {queryResult.columns.map((column) => (
+                  <th key={column}>{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {queryResult.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {queryResult.columns.map((column) => (
+                    <td key={column}>{String(row[column] ?? "-")}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p>조건에 맞는 데이터가 없습니다.</p>
+      )}
+    </div>
+  );
+}
+
 function ReportContent({
   activeTab,
   detailColumns: activeDetailColumns,
@@ -464,7 +656,7 @@ export function ReportDashboard() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [activeTab, setActiveTab] = useState("Overview");
-  const [activeView, setActiveView] = useState<"dashboard" | "reports" | "report">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "reports" | "report" | "questions">("dashboard");
   const [isReportsExpanded, setIsReportsExpanded] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardOverview | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
@@ -487,9 +679,13 @@ export function ReportDashboard() {
   const [isCreating, setIsCreating] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [question, setQuestion] = useState("");
+  const [questionAnswer, setQuestionAnswer] = useState<SqlGuideResponse | null>(null);
+  const [isQuestionSubmitting, setIsQuestionSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const pageTitle = activeView === "dashboard" ? "Dashboard" : summary ? "Summary" : "Reports";
+  const pageTitle =
+    activeView === "dashboard" ? "Dashboard" : activeView === "questions" ? "Q&A" : summary ? "Summary" : "Reports";
   const defaultReportName = useMemo(() => getDefaultReportName(), []);
 
   useEffect(() => {
@@ -635,6 +831,26 @@ export function ReportDashboard() {
     await loadReportDetail(selectedReport.id, activeTab, page);
   }
 
+  async function handleQuestionSubmit() {
+    const trimmedQuestion = question.trim();
+
+    if (!trimmedQuestion) {
+      return;
+    }
+
+    setIsQuestionSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await createSqlGuide(trimmedQuestion);
+      setQuestionAnswer(response);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "답변을 생성하지 못했습니다.");
+    } finally {
+      setIsQuestionSubmitting(false);
+    }
+  }
+
   async function handleSelectReport(report: Report) {
     setSelectedReport(report);
     setSummary(null);
@@ -668,6 +884,10 @@ export function ReportDashboard() {
         isReportsExpanded={isReportsExpanded}
         onCreateClick={() => setIsCreateOpen(true)}
         onDashboardClick={() => setActiveView("dashboard")}
+        onQuestionsClick={() => {
+          setActiveView("questions");
+          setErrorMessage(null);
+        }}
         onReportsClick={() => {
           setActiveView("reports");
           setIsReportsExpanded(true);
@@ -682,6 +902,16 @@ export function ReportDashboard() {
         <main className="main-content">
           {activeView === "dashboard" ? (
             <DashboardPanel dashboard={dashboard} isLoading={isDashboardLoading} />
+          ) : activeView === "questions" ? (
+            <QuestionsPanel
+              answer={questionAnswer}
+              errorMessage={errorMessage}
+              isSubmitting={isQuestionSubmitting}
+              onCopied={() => setToast("복사되었습니다.")}
+              onQuestionChange={setQuestion}
+              onSubmit={handleQuestionSubmit}
+              question={question}
+            />
           ) : activeView === "reports" ? (
             <ReportsListPanel
               onCreateClick={() => setIsCreateOpen(true)}
