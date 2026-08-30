@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "BithumbTradingSansPC";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/BithumbTradingSansPC-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BithumbTradingSansPC";
+  font-style: normal;
+  font-weight: 500;
+  src: url("/fonts/BithumbTradingSansPC-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BithumbTradingSansPC";
+  font-style: normal;
+  font-weight: 600;
+  src: url("/fonts/BithumbTradingSansPC-Semibold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "BithumbTradingSansPC";
+  font-style: normal;
+  font-weight: 700;
+  src: url("/fonts/BithumbTradingSansPC-Bold.woff2") format("woff2");
+}
+
 :root {
   --wh-color-text-primary: #1c2028;
   --wh-color-text-secondary: #707882;
@@ -28,7 +56,7 @@ body {
   margin: 0;
   background: var(--wh-color-bg-page);
   color: var(--wh-color-text-primary);
-  font-family: Pretendard, "Noto Sans KR", "Noto Sans", Arial, Helvetica, sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", "Noto Sans", Arial, Helvetica, sans-serif;
   letter-spacing: 0;
 }
 
@@ -46,7 +74,7 @@ button:disabled {
 }
 
 .wh-sidebar-font {
-  font-family: Poppins, Pretendard, "Noto Sans KR", Arial, Helvetica, sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", Arial, Helvetica, sans-serif;
 }
 
 .app-shell {
@@ -79,7 +107,7 @@ button:disabled {
   border: 0;
   background: transparent;
   color: rgb(0 0 0 / 50%);
-  font-family: Poppins, Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", sans-serif;
   font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
@@ -157,7 +185,7 @@ button:disabled {
   border-radius: 4px;
   background: transparent;
   color: rgb(0 0 0 / 50%);
-  font-family: Poppins, Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", sans-serif;
   font-size: 16px;
   font-weight: 500;
   line-height: 1.5;
@@ -503,7 +531,7 @@ button:disabled {
 
 .pick-date-header strong {
   color: #454545;
-  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", sans-serif;
   font-size: 16px;
   font-weight: 500;
   line-height: 1;
@@ -546,7 +574,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   color: #737373;
-  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", sans-serif;
   font-size: 14px;
   font-weight: 500;
   line-height: 1;
@@ -566,7 +594,7 @@ button:disabled {
   border-radius: 18px;
   background: white;
   color: #454545;
-  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "BithumbTradingSansPC", Pretendard, "Noto Sans KR", sans-serif;
   font-size: 14px;
   font-weight: 400;
   line-height: 1;
