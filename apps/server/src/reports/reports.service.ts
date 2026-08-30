@@ -10,6 +10,7 @@ import { OnboardingService } from '../onboarding/onboarding.service.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
 import { formatDateLabel, isDateBeforeOrEqual } from '../utils/date.util.js';
 import { CreateReportDto } from './dto/create-report.dto.js';
+import { ListReportDetailsQueryDto } from './dto/list-report-details-query.dto.js';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto.js';
 import {
   ReportListResponseDto,
@@ -155,6 +156,82 @@ export class ReportsService {
       this.assertReportDates(report);
 
       return this.toReportSummaryResponse(report, result);
+    } catch (error) {
+      this.handleUnexpectedError(error);
+    }
+  }
+
+  async getReportTransactions(
+    reportId: string,
+    query: ListReportDetailsQueryDto,
+  ): Promise<ReportDetailResponseDto> {
+    try {
+      const report = await this.findReportById(reportId);
+      this.assertReportDates(report);
+      const limit = query.limit ?? 50;
+      const items = await this.transactionsService.getDetailsUntil(report.currentDate, limit);
+
+      return this.toDetailResponse(
+        report,
+        {
+          type: 'CUMULATIVE_UNTIL_CURRENT_DATE',
+          currentDate: report.currentDate,
+        },
+        TRANSACTION_COLUMNS,
+        items,
+        limit,
+      );
+    } catch (error) {
+      this.handleUnexpectedError(error);
+    }
+  }
+
+  async getReportBalances(
+    reportId: string,
+    query: ListReportDetailsQueryDto,
+  ): Promise<ReportDetailResponseDto> {
+    try {
+      const report = await this.findReportById(reportId);
+      this.assertReportDates(report);
+      const limit = query.limit ?? 50;
+      const items = await this.balancesService.getDetailsByBasisDate(report.currentDate, limit);
+
+      return this.toDetailResponse(
+        report,
+        {
+          type: 'LATEST_SNAPSHOT_UNTIL_CURRENT_DATE',
+          currentDate: report.currentDate,
+          balanceBasisDate: report.currentDate,
+        },
+        BALANCE_COLUMNS,
+        items,
+        limit,
+      );
+    } catch (error) {
+      this.handleUnexpectedError(error);
+    }
+  }
+
+  async getReportOnboarding(
+    reportId: string,
+    query: ListReportDetailsQueryDto,
+  ): Promise<ReportDetailResponseDto> {
+    try {
+      const report = await this.findReportById(reportId);
+      this.assertReportDates(report);
+      const limit = query.limit ?? 50;
+      const items = await this.onboardingService.getDetailsUntil(report.currentDate, limit);
+
+      return this.toDetailResponse(
+        report,
+        {
+          type: 'CUMULATIVE_UNTIL_CURRENT_DATE',
+          currentDate: report.currentDate,
+        },
+        ONBOARDING_COLUMNS,
+        items,
+        limit,
+      );
     } catch (error) {
       this.handleUnexpectedError(error);
     }
@@ -400,6 +477,29 @@ export class ReportsService {
     };
   }
 
+  private toDetailResponse(
+    report: ReportEntity & { currentDate: string },
+    basis: DetailBasis,
+    columns: DetailColumn[],
+    items: object[],
+    limit: number,
+  ): ReportDetailResponseDto {
+    return {
+      report: {
+        id: report.id,
+        name: report.name,
+        currentDate: report.currentDate,
+      },
+      basis,
+      columns,
+      items,
+      page: {
+        limit,
+        nextCursor: null,
+      },
+    };
+  }
+
   private handleUnexpectedError(error: unknown): never {
     if (error instanceof HttpException) {
       throw error;
@@ -408,3 +508,81 @@ export class ReportsService {
     throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR);
   }
 }
+
+export interface DetailColumn {
+  key: string;
+  label: string;
+  dataType: string;
+}
+
+export interface DetailBasis {
+  type: string;
+  currentDate: string;
+  balanceBasisDate?: string;
+}
+
+export interface ReportDetailResponseDto {
+  report: {
+    id: string;
+    name: string;
+    currentDate: string;
+  };
+  basis: DetailBasis;
+  columns: DetailColumn[];
+  items: object[];
+  page: {
+    limit: number;
+    nextCursor: string | null;
+  };
+}
+
+const TRANSACTION_COLUMNS: DetailColumn[] = [
+  { key: 'transaction_type', label: '구분', dataType: 'varchar(20)' },
+  { key: 'inout_type', label: '입출금구분', dataType: 'varchar(20)' },
+  { key: 'account_status', label: '계정상태', dataType: 'varchar(100)' },
+  { key: 'corp_nm', label: '법인이름', dataType: 'varchar(300)' },
+  { key: 'cust_id', label: '고객ID', dataType: 'varchar(50)' },
+  { key: 'mem_id', label: '회원ID', dataType: 'varchar(50)' },
+  { key: 'market_stage', label: '시장참여단계', dataType: 'varchar(100)' },
+  { key: 'corp_type', label: '법인유형', dataType: 'varchar(200)' },
+  { key: 'coin_symbol_nm', label: '코인심볼명', dataType: 'varchar(2000)' },
+  { key: 'transaction_dtm', label: '거래날짜', dataType: 'timestamp' },
+  { key: 'coin_qty', label: '코인수량', dataType: 'numeric(38,18)' },
+  { key: 'krw_amt', label: '원화환산거래금액', dataType: 'numeric(38,18)' },
+  { key: 'basis_dt', label: '거래날짜', dataType: 'date' },
+  { key: 'is_core', label: 'core여부', dataType: 'varchar(1)' },
+];
+
+const BALANCE_COLUMNS: DetailColumn[] = [
+  { key: 'basis_dt', label: '집계 날짜', dataType: 'varchar(50)' },
+  { key: 'cust_id', label: '고객ID', dataType: 'varchar(50)' },
+  { key: 'mem_id', label: '회원ID', dataType: 'varchar(50)' },
+  { key: 'account_status', label: '계정상태', dataType: 'varchar(100)' },
+  { key: 'kyc_status', label: '고객확인상태', dataType: 'varchar(100)' },
+  { key: 'corp_nm', label: '법인이름', dataType: 'varchar(300)' },
+  { key: 'market_stage', label: '시장참여단계', dataType: 'varchar(100)' },
+  { key: 'corp_type', label: '법인유형', dataType: 'varchar(200)' },
+  { key: 'is_core', label: 'core여부', dataType: 'varchar(1)' },
+  { key: 'coin_symbol_nm', label: '코인심볼명', dataType: 'varchar(50)' },
+  { key: 'coin_qty', label: '코인수량', dataType: 'numeric(38,18)' },
+  { key: 'balance_krw_amt', label: '원화환산잔고', dataType: 'numeric(38,18)' },
+];
+
+const ONBOARDING_COLUMNS: DetailColumn[] = [
+  { key: 'cust_id', label: '고객ID', dataType: 'varchar(50)' },
+  { key: 'mem_id', label: '회원ID', dataType: 'varchar(50)' },
+  { key: 'corp_nm', label: '법인이름', dataType: 'varchar(300)' },
+  { key: 'account_status', label: '계정상태', dataType: 'varchar(100)' },
+  { key: 'kyc_status', label: '고객확인상태', dataType: 'varchar(100)' },
+  { key: 'market_stage', label: '시장참여단계', dataType: 'varchar(100)' },
+  { key: 'corp_market_type', label: '법인유형', dataType: 'varchar(200)' },
+  { key: 'corp_type', label: 'corp_type', dataType: 'varchar(200)' },
+  { key: 'is_core', label: 'core여부', dataType: 'varchar(1)' },
+  { key: 'member_join_dtm', label: '가입날짜', dataType: 'timestamp' },
+  { key: 'mem_leave_dtm', label: '탈퇴날짜', dataType: 'timestamp' },
+  { key: 'first_kyc_dtm', label: '최초고객확인날짜', dataType: 'timestamp' },
+  { key: 'latest_kyc_dtm', label: '마지막고객확인날짜', dataType: 'timestamp' },
+  { key: 'next_kyc_dtm', label: '다음고객확인날짜', dataType: 'timestamp' },
+  { key: 'is_onboarding_target', label: '온보딩타겟여부', dataType: 'varchar(1)' },
+  { key: 'loaded_at', label: '적재날짜', dataType: 'timestamp' },
+];

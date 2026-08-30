@@ -25,6 +25,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateReportDto } from './dto/create-report.dto.js';
+import { ListReportDetailsQueryDto } from './dto/list-report-details-query.dto.js';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto.js';
 import { RunReportDto } from './dto/run-report.dto.js';
 import { UpdateReportDto } from './dto/update-report.dto.js';
@@ -246,5 +247,93 @@ export class ReportsController {
   })
   getReportSummary(@Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string) {
     return this.reportsService.getReportSummary(reportId);
+  }
+
+  @Get(':reportId/transactions')
+  @ApiOperation({ summary: 'Get report transactions' })
+  @ApiParam(reportIdSwaggerParam)
+  @ApiQuery({ name: 'limit', required: false, example: 50 })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOkResponse({
+    description: '거래 내역 상세 조회 성공',
+    example: {
+      report: {
+        id: reportIdExample,
+        name: '08.27 실적',
+        currentDate: '2026-08-27',
+      },
+      basis: {
+        type: 'CUMULATIVE_UNTIL_CURRENT_DATE',
+        currentDate: '2026-08-27',
+      },
+      columns: [],
+      items: [],
+      page: { limit: 50, nextCursor: null },
+    },
+  })
+  getReportTransactions(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Query() query: ListReportDetailsQueryDto,
+  ) {
+    return this.reportsService.getReportTransactions(reportId, query);
+  }
+
+  @Get(':reportId/balances')
+  @ApiOperation({ summary: 'Get report balances' })
+  @ApiParam(reportIdSwaggerParam)
+  @ApiQuery({ name: 'limit', required: false, example: 50 })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOkResponse({
+    description: '잔고 상세 조회 성공',
+    example: {
+      report: {
+        id: reportIdExample,
+        name: '08.27 실적',
+        currentDate: '2026-08-27',
+      },
+      basis: {
+        type: 'LATEST_SNAPSHOT_UNTIL_CURRENT_DATE',
+        currentDate: '2026-08-27',
+        balanceBasisDate: '2026-08-27',
+      },
+      columns: [],
+      items: [],
+      page: { limit: 50, nextCursor: null },
+    },
+  })
+  getReportBalances(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Query() query: ListReportDetailsQueryDto,
+  ) {
+    return this.reportsService.getReportBalances(reportId, query);
+  }
+
+  @Get(':reportId/onboarding')
+  @ApiOperation({ summary: 'Get report onboarding' })
+  @ApiParam(reportIdSwaggerParam)
+  @ApiQuery({ name: 'limit', required: false, example: 50 })
+  @ApiQuery({ name: 'cursor', required: false })
+  @ApiOkResponse({
+    description: '온보딩 상세 조회 성공',
+    example: {
+      report: {
+        id: reportIdExample,
+        name: '08.27 실적',
+        currentDate: '2026-08-27',
+      },
+      basis: {
+        type: 'CUMULATIVE_UNTIL_CURRENT_DATE',
+        currentDate: '2026-08-27',
+      },
+      columns: [],
+      items: [],
+      page: { limit: 50, nextCursor: null },
+    },
+  })
+  getReportOnboarding(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Query() query: ListReportDetailsQueryDto,
+  ) {
+    return this.reportsService.getReportOnboarding(reportId, query);
   }
 }

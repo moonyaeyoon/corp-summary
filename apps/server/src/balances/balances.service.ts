@@ -4,7 +4,7 @@ import {
   createEmptySummaryMetricMap,
   resolveSummaryGroupKey,
 } from '../reports/report-summary-groups.js';
-import { BalancesRepository } from './balances.repository.js';
+import { BalanceDetailRawRow, BalancesRepository } from './balances.repository.js';
 
 @Injectable()
 export class BalancesService {
@@ -20,5 +20,20 @@ export class BalancesService {
     }
 
     return metrics;
+  }
+
+  async getLatestBasisDateOnOrBefore(currentDate: string): Promise<string | null> {
+    return this.balancesRepository.findLatestBasisDateOnOrBefore(currentDate);
+  }
+
+  async getTotalBalanceByBasisDate(basisDate: string): Promise<number> {
+    return Number(await this.balancesRepository.sumBalanceByBasisDate(basisDate));
+  }
+
+  async getDetailsByBasisDate(
+    basisDate: string,
+    limit: number,
+  ): Promise<BalanceDetailRawRow[]> {
+    return this.balancesRepository.findDetailsByBasisDate(basisDate, limit);
   }
 }

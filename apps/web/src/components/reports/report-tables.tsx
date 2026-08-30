@@ -1,16 +1,19 @@
 "use client";
 
 import { buildSummaryClipboardText } from "@/lib/report-export";
-import type { ComparisonTableRow, ReportSummary, SummaryTableRow } from "@/lib/reports-api";
+import type { ComparisonTableRow, DetailColumn, ReportSummary, SummaryTableRow } from "@/lib/reports-api";
 import { Icon } from "./icon";
-
-export interface DataColumn {
-  key: string;
-  label: string;
-}
 
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString("ko-KR") : "-";
+}
+
+function formatCellValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  return typeof value === "number" ? formatNumber(value) : value;
 }
 
 async function copyText(text: string, onCopied?: () => void) {
@@ -35,9 +38,6 @@ function buildWeeklyText(rows: SummaryTableRow[]): string {
       [
         row.corpType,
         row.targetGroup || "-",
-        row.previous.onboardingCount,
-        row.previous.balanceKrw,
-        row.previous.transactionKrw,
         row.current.onboardingCount,
         row.current.balanceKrw,
         row.current.transactionKrw,
@@ -100,11 +100,6 @@ export function WeeklyPerformanceTable({
   const rows = summary.summaryTable.rows;
   const total = rows.reduce(
     (acc, row) => ({
-      previous: {
-        onboardingCount: acc.previous.onboardingCount + row.previous.onboardingCount,
-        balanceKrw: acc.previous.balanceKrw + row.previous.balanceKrw,
-        transactionKrw: acc.previous.transactionKrw + row.previous.transactionKrw,
-      },
       current: {
         onboardingCount: acc.current.onboardingCount + row.current.onboardingCount,
         balanceKrw: acc.current.balanceKrw + row.current.balanceKrw,
@@ -112,7 +107,6 @@ export function WeeklyPerformanceTable({
       },
     }),
     {
-      previous: { onboardingCount: 0, balanceKrw: 0, transactionKrw: 0 },
       current: { onboardingCount: 0, balanceKrw: 0, transactionKrw: 0 },
     },
   );
@@ -127,19 +121,12 @@ export function WeeklyPerformanceTable({
         <table className="wh-table weekly-table">
           <thead>
             <tr>
-              <th rowSpan={2}>법인 유형</th>
-              <th rowSpan={2}>
+              <th>법인 유형</th>
+              <th>
                 타겟
                 <br />
                 구분
               </th>
-              <th colSpan={3}>{summary.summaryTable.previousLabel}</th>
-              <th colSpan={3}>{summary.summaryTable.currentLabel}</th>
-            </tr>
-            <tr>
-              <th>온보딩수(개)</th>
-              <th>예치금(원)</th>
-              <th>거래대금(원)</th>
               <th>온보딩수(개)</th>
               <th>예치금(원)</th>
               <th>거래대금(원)</th>
@@ -150,9 +137,6 @@ export function WeeklyPerformanceTable({
               <tr key={`${row.corpType}-${row.targetGroup}-${index}`}>
                 <td>{row.corpType}</td>
                 <td>{row.targetGroup || "-"}</td>
-                <td className="number-cell">{formatNumber(row.previous.onboardingCount)}</td>
-                <td className="number-cell">{formatNumber(row.previous.balanceKrw)}</td>
-                <td className="number-cell">{formatNumber(row.previous.transactionKrw)}</td>
                 <td className="number-cell">{formatNumber(row.current.onboardingCount)}</td>
                 <td className="number-cell">{formatNumber(row.current.balanceKrw)}</td>
                 <td className="number-cell">{formatNumber(row.current.transactionKrw)}</td>
@@ -161,9 +145,6 @@ export function WeeklyPerformanceTable({
             <tr className="total-row">
               <td>합계</td>
               <td>-</td>
-              <td className="number-cell">{formatNumber(total.previous.onboardingCount)}</td>
-              <td className="number-cell">{formatNumber(total.previous.balanceKrw)}</td>
-              <td className="number-cell">{formatNumber(total.previous.transactionKrw)}</td>
               <td className="number-cell">{formatNumber(total.current.onboardingCount)}</td>
               <td className="number-cell">{formatNumber(total.current.balanceKrw)}</td>
               <td className="number-cell">{formatNumber(total.current.transactionKrw)}</td>
@@ -268,7 +249,15 @@ export function OverviewPanel({
   );
 }
 
-export function DataList({ columns, rows }: { columns: DataColumn[]; rows: Record<string, string>[] }) {
+export function DataList({
+  columns,
+  isLoading = false,
+  rows,
+}: {
+  columns: DetailColumn[];
+  isLoading?: boolean;
+  rows: Record<string, string | number | null>[];
+}) {
   return (
     <div className="data-list">
       <div className="table-scroll">
@@ -281,17 +270,23 @@ export function DataList({ columns, rows }: { columns: DataColumn[]; rows: Recor
             </tr>
           </thead>
           <tbody>
-            {rows.length > 0 ? (
+            {isLoading ? (
+              <tr>
+                <td className="empty-cell" colSpan={Math.max(columns.length, 1)}>
+                  데이터를 불러오는 중입니다.
+                </td>
+              </tr>
+            ) : rows.length > 0 ? (
               rows.map((row, index) => (
                 <tr key={`${row.id ?? "row"}-${index}`}>
                   {columns.map((column) => (
-                    <td key={column.key}>{row[column.key] ?? "-"}</td>
+                    <td key={column.key}>{formatCellValue(row[column.key])}</td>
                   ))}
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="empty-cell" colSpan={columns.length}>
+                <td className="empty-cell" colSpan={Math.max(columns.length, 1)}>
                   조회된 데이터가 없습니다.
                 </td>
               </tr>

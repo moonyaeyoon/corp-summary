@@ -3,17 +3,22 @@
 import { exportSummaryAsExcel } from "@/lib/report-export";
 import {
   createReport,
+  getDashboardOverview,
+  getReportDetail,
+  getReportSummary,
   listReports,
   runReport,
+  type DashboardOverview,
+  type DetailColumn,
   type Report,
   type ReportSummary,
 } from "@/lib/reports-api";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DatePicker } from "./date-picker";
 import { Icon } from "./icon";
-import { DataList, MainTabs, OverviewPanel, type DataColumn } from "./report-tables";
+import { DataList, MainTabs, OverviewPanel } from "./report-tables";
 
-const detailColumns: Record<string, DataColumn[]> = {
+const detailColumns: Record<string, DetailColumn[]> = {
   "거래 내역": [
     { key: "transaction_type", label: "구분" },
     { key: "inout_type", label: "입출금구분" },
@@ -46,15 +51,11 @@ const detailColumns: Record<string, DataColumn[]> = {
   ],
 };
 
-function formatSidebarDate(date: string | null): string {
-  if (!date) {
-    return "--.--";
-  }
-
-  const [, month, day] = date.split("-");
-
-  return `${month}.${day}`;
-}
+const detailEndpointByTab: Record<string, "transactions" | "balances" | "onboarding"> = {
+  "거래 내역": "transactions",
+  잔고: "balances",
+  온보딩: "onboarding",
+};
 
 function getDefaultReportName(): string {
   const now = new Date();
@@ -65,48 +66,77 @@ function getDefaultReportName(): string {
 }
 
 function Sidebar({
+  activeView,
+  isReportsExpanded,
   onCreateClick,
+  onDashboardClick,
+  onReportsClick,
   onSelectReport,
+  onToggleReports,
   reports,
   selectedReportId,
 }: {
+  activeView: "dashboard" | "reports" | "report";
+  isReportsExpanded: boolean;
   onCreateClick: () => void;
+  onDashboardClick: () => void;
+  onReportsClick: () => void;
   onSelectReport: (report: Report) => void;
+  onToggleReports: () => void;
   reports: Report[];
   selectedReportId: string | null;
 }) {
   return (
     <aside className="sidebar">
       <nav aria-label="Primary" className="sidebar-nav">
-        <button className="sidebar-link active" type="button">
+        <button
+          className={activeView === "dashboard" ? "sidebar-link active" : "sidebar-link"}
+          onClick={onDashboardClick}
+          type="button"
+        >
           <Icon name="chart" size={24} />
           <span>Dashboard</span>
         </button>
 
         <div className="sidebar-group">
           <div className="sidebar-group-title">
-            <button className="sidebar-link" type="button">
+            <button
+              className={activeView !== "dashboard" ? "sidebar-link active" : "sidebar-link"}
+              onClick={onReportsClick}
+              type="button"
+            >
               <Icon name="checkout" size={24} />
               <span>실적 집계</span>
             </button>
             <button className="sidebar-icon-button" onClick={onCreateClick} title="리포트 만들기" type="button">
               +
             </button>
-            <Icon name="chevronDown" size={18} />
+            <button
+              aria-expanded={isReportsExpanded}
+              className="sidebar-toggle-button"
+              onClick={onToggleReports}
+              title={isReportsExpanded ? "리포트 목록 접기" : "리포트 목록 펼치기"}
+              type="button"
+            >
+              <Icon name="chevronDown" size={18} />
+            </button>
           </div>
-          <div className="report-nav-list">
-            {reports.map((report) => (
-              <button
-                className={report.id === selectedReportId ? "report-nav-item selected" : "report-nav-item"}
-                key={report.id}
-                onClick={() => onSelectReport(report)}
-                title={report.name}
-                type="button"
-              >
-                {formatSidebarDate(report.currentDate ?? report.createdAt?.slice(0, 10) ?? null)}
-              </button>
-            ))}
-          </div>
+          {isReportsExpanded ? (
+            <div className="report-nav-list">
+              {reports.map((report) => (
+                <button
+                  className={report.id === selectedReportId ? "report-nav-item selected" : "report-nav-item"}
+                  key={report.id}
+                  onClick={() => onSelectReport(report)}
+                  title={report.name}
+                  type="button"
+                >
+                  <span className="report-radio" />
+                  <span>{report.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <button className="sidebar-link muted" type="button">
@@ -269,21 +299,133 @@ function ReportSetupPanel({
   );
 }
 
+function formatKrw(value: number): string {
+  return `${Math.round(value).toLocaleString("ko-KR")}원`;
+}
+
+function formatDate(value: string | number | null | undefined): string {
+  if (!value) {
+    return "-";
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function DashboardPanel({
+  dashboard,
+  isLoading,
+}: {
+  dashboard: DashboardOverview | null;
+  isLoading: boolean;
+}) {
+  const todayLabel = dashboard?.basisDate ?? new Date().toISOString().slice(0, 10);
+  const upcomingRows = dashboard?.upcomingKycCorporations ?? [];
+
+  return (
+    <section className="dashboard-panel">
+      <div className="dashboard-date">
+        <span>Today</span>
+        <strong>{todayLabel}</strong>
+      </div>
+      <div className="metric-strip">
+        <div className="metric-item">
+          <span>거래대금</span>
+          <strong>{formatKrw(dashboard?.totals.transactionKrw ?? 0)}</strong>
+        </div>
+        <div className="metric-item">
+          <span>예치금</span>
+          <strong>{formatKrw(dashboard?.totals.balanceKrw ?? 0)}</strong>
+          <small>잔고 기준일 {dashboard?.balanceBasisDate ?? "-"}</small>
+        </div>
+        <div className="metric-item">
+          <span>온보딩</span>
+          <strong>{(dashboard?.totals.onboardingCount ?? 0).toLocaleString("ko-KR")}개사</strong>
+        </div>
+      </div>
+      <section className="dashboard-list-section">
+        <div className="section-heading">
+          <h3>KYC 돌아오는 법인</h3>
+          <span className="section-note">오늘부터 1주일 이내</span>
+        </div>
+        {isLoading ? (
+          <div className="empty-dashboard">데이터를 불러오는 중입니다.</div>
+        ) : upcomingRows.length > 0 ? (
+          <div className="kyc-list">
+            {upcomingRows.map((row, index) => (
+              <div className="kyc-row" key={`${row.cust_id ?? "corp"}-${index}`}>
+                <div>
+                  <strong>{row.corp_nm ?? "-"}</strong>
+                  <span>
+                    {row.market_stage ?? "-"} / {row.corp_market_type ?? row.corp_type ?? "-"}
+                  </span>
+                </div>
+                <time>{formatDate(row.next_kyc_dtm)}</time>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-dashboard">일주일 안에 KYC가 돌아오는 법인이 없습니다.</div>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function ReportsListPanel({
+  onCreateClick,
+  onSelectReport,
+  reports,
+}: {
+  onCreateClick: () => void;
+  onSelectReport: (report: Report) => void;
+  reports: Report[];
+}) {
+  return (
+    <section className="reports-list-panel">
+      <div className="report-section-title">
+        <h2>리포트 목록</h2>
+        <button className="primary-button small-primary-button" onClick={onCreateClick} type="button">
+          리포트 만들기
+        </button>
+      </div>
+      <div className="reports-grid">
+        {reports.length > 0 ? (
+          reports.map((report) => (
+            <button className="report-list-item" key={report.id} onClick={() => onSelectReport(report)} type="button">
+              <strong>{report.name}</strong>
+              <span>{report.status}</span>
+              <small>
+                {report.previousDate ?? "-"} ~ {report.currentDate ?? "-"}
+              </small>
+            </button>
+          ))
+        ) : (
+          <div className="empty-dashboard">생성된 리포트가 없습니다.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ReportContent({
   activeTab,
+  detailColumns: activeDetailColumns,
+  detailRows,
+  isDetailLoading,
   onCopied,
   onExcelDownload,
   onTabChange,
   summary,
 }: {
   activeTab: string;
+  detailColumns: DetailColumn[];
+  detailRows: Record<string, string | number | null>[];
+  isDetailLoading: boolean;
   onCopied: () => void;
   onExcelDownload: () => void;
   onTabChange: (tab: string) => void;
   summary: ReportSummary;
 }) {
-  const columns = detailColumns[activeTab] ?? [];
-
   return (
     <section className="report-content">
       <MainTabs activeTab={activeTab} onChange={onTabChange} />
@@ -299,7 +441,7 @@ function ReportContent({
           <OverviewPanel summary={summary} onCopied={onCopied} />
         </div>
       ) : (
-        <DataList columns={columns} rows={[]} />
+        <DataList columns={activeDetailColumns} isLoading={isDetailLoading} rows={detailRows} />
       )}
     </section>
   );
@@ -310,6 +452,14 @@ export function ReportDashboard() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [activeTab, setActiveTab] = useState("Overview");
+  const [activeView, setActiveView] = useState<"dashboard" | "reports" | "report">("dashboard");
+  const [isReportsExpanded, setIsReportsExpanded] = useState(true);
+  const [dashboard, setDashboard] = useState<DashboardOverview | null>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+  const [detailData, setDetailData] = useState<
+    Record<string, { columns: DetailColumn[]; rows: Record<string, string | number | null>[] }>
+  >({});
+  const [detailLoadingTab, setDetailLoadingTab] = useState<string | null>(null);
   const [previousDate, setPreviousDate] = useState("2026-07-07");
   const [currentDate, setCurrentDate] = useState("2026-08-27");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -318,16 +468,22 @@ export function ReportDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const pageTitle = summary ? "Summary" : "Reports";
+  const pageTitle = activeView === "dashboard" ? "Dashboard" : summary ? "Summary" : "Reports";
   const defaultReportName = useMemo(() => getDefaultReportName(), []);
 
   useEffect(() => {
     listReports()
       .then((response) => {
         setReports(response.items);
-        setSelectedReport((current) => current ?? response.items[0] ?? null);
       })
       .catch((error: Error) => setErrorMessage(error.message));
+  }, []);
+
+  useEffect(() => {
+    getDashboardOverview()
+      .then(setDashboard)
+      .catch((error: Error) => setErrorMessage(error.message))
+      .finally(() => setIsDashboardLoading(false));
   }, []);
 
   useEffect(() => {
@@ -354,6 +510,8 @@ export function ReportDashboard() {
       setSelectedReport(report);
       setSummary(null);
       setActiveTab("Overview");
+      setActiveView("report");
+      setDetailData({});
       setIsCreateOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "리포트를 생성하지 못했습니다.");
@@ -379,6 +537,7 @@ export function ReportDashboard() {
     try {
       const result = await runReport(selectedReport.id, previousDate, currentDate);
       setSummary(result);
+      setDetailData({});
       setSelectedReport((report) =>
         report
           ? {
@@ -402,6 +561,7 @@ export function ReportDashboard() {
         ),
       );
       setActiveTab("Overview");
+      setActiveView("report");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "집계를 실행하지 못했습니다.");
     } finally {
@@ -409,10 +569,47 @@ export function ReportDashboard() {
     }
   }
 
-  function handleSelectReport(report: Report) {
+  async function loadReportDetail(reportId: string, tab: string) {
+    const endpoint = detailEndpointByTab[tab];
+
+    if (!endpoint) {
+      return;
+    }
+
+    setDetailLoadingTab(tab);
+    setErrorMessage(null);
+
+    try {
+      const response = await getReportDetail(reportId, endpoint);
+      setDetailData((current) => ({
+        ...current,
+        [tab]: {
+          columns: response.columns.length > 0 ? response.columns : detailColumns[tab],
+          rows: response.items,
+        },
+      }));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "상세 데이터를 불러오지 못했습니다.");
+    } finally {
+      setDetailLoadingTab(null);
+    }
+  }
+
+  async function handleTabChange(tab: string) {
+    setActiveTab(tab);
+
+    if (tab !== "Overview" && selectedReport) {
+      await loadReportDetail(selectedReport.id, tab);
+    }
+  }
+
+  async function handleSelectReport(report: Report) {
     setSelectedReport(report);
     setSummary(null);
     setActiveTab("Overview");
+    setActiveView("report");
+    setDetailData({});
+    setErrorMessage(null);
 
     if (report.previousDate) {
       setPreviousDate(report.previousDate);
@@ -421,25 +618,53 @@ export function ReportDashboard() {
     if (report.currentDate) {
       setCurrentDate(report.currentDate);
     }
+
+    if (report.status === "COMPLETED") {
+      try {
+        const storedSummary = await getReportSummary(report.id);
+        setSummary(storedSummary);
+      } catch {
+        setSummary(null);
+      }
+    }
   }
 
   return (
     <div className="app-shell">
       <Sidebar
+        activeView={activeView}
+        isReportsExpanded={isReportsExpanded}
         onCreateClick={() => setIsCreateOpen(true)}
-        onSelectReport={handleSelectReport}
+        onDashboardClick={() => setActiveView("dashboard")}
+        onReportsClick={() => {
+          setActiveView("reports");
+          setIsReportsExpanded(true);
+        }}
+        onSelectReport={(report) => void handleSelectReport(report)}
+        onToggleReports={() => setIsReportsExpanded((current) => !current)}
         reports={reports}
         selectedReportId={selectedReport?.id ?? null}
       />
       <div className="main-area">
         <Header title={pageTitle} />
         <main className="main-content">
-          {summary ? (
+          {activeView === "dashboard" ? (
+            <DashboardPanel dashboard={dashboard} isLoading={isDashboardLoading} />
+          ) : activeView === "reports" ? (
+            <ReportsListPanel
+              onCreateClick={() => setIsCreateOpen(true)}
+              onSelectReport={(report) => void handleSelectReport(report)}
+              reports={reports}
+            />
+          ) : summary ? (
             <ReportContent
               activeTab={activeTab}
+              detailColumns={detailData[activeTab]?.columns ?? detailColumns[activeTab] ?? []}
+              detailRows={detailData[activeTab]?.rows ?? []}
+              isDetailLoading={detailLoadingTab === activeTab}
               onCopied={() => setToast("복사되었습니다.")}
               onExcelDownload={() => exportSummaryAsExcel(summary)}
-              onTabChange={setActiveTab}
+              onTabChange={(tab) => void handleTabChange(tab)}
               summary={summary}
             />
           ) : (

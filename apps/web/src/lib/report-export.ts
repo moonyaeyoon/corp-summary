@@ -24,9 +24,6 @@ export function buildSummaryClipboardText(summary: ReportSummary): string {
       [
         row.corpType,
         row.targetGroup || "-",
-        row.previous.onboardingCount,
-        row.previous.balanceKrw,
-        row.previous.transactionKrw,
         row.current.onboardingCount,
         row.current.balanceKrw,
         row.current.transactionKrw,
@@ -54,12 +51,9 @@ export function buildSummaryClipboardText(summary: ReportSummary): string {
     [
       "법인 유형",
       "타겟 구분",
-      "이전 온보딩수",
-      "이전 예치금",
-      "이전 거래대금",
-      "현재 온보딩수",
-      "현재 예치금",
-      "현재 거래대금",
+      "온보딩수",
+      "예치금",
+      "거래대금",
     ].join("\t"),
     weeklyRows,
     "",
@@ -80,9 +74,6 @@ export function exportSummaryAsExcel(summary: ReportSummary): void {
       [
         cell(row.corpType),
         cell(row.targetGroup || "-"),
-        cell(row.previous.onboardingCount),
-        cell(row.previous.balanceKrw),
-        cell(row.previous.transactionKrw),
         cell(row.current.onboardingCount),
         cell(row.current.balanceKrw),
         cell(row.current.transactionKrw),
@@ -129,9 +120,6 @@ export function exportSummaryAsExcel(summary: ReportSummary): void {
     <tr>
       ${cell("법인 유형", "th")}
       ${cell("타겟 구분", "th")}
-      ${cell(`${summary.summaryTable.previousLabel} 온보딩수`, "th")}
-      ${cell(`${summary.summaryTable.previousLabel} 예치금(원)`, "th")}
-      ${cell(`${summary.summaryTable.previousLabel} 거래대금(원)`, "th")}
       ${cell(`${summary.summaryTable.currentLabel} 온보딩수`, "th")}
       ${cell(`${summary.summaryTable.currentLabel} 예치금(원)`, "th")}
       ${cell(`${summary.summaryTable.currentLabel} 거래대금(원)`, "th")}

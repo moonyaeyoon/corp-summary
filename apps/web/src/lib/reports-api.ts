@@ -73,6 +73,38 @@ export interface ReportSummary {
   };
 }
 
+export interface DetailColumn {
+  key: string;
+  label: string;
+  dataType?: string;
+}
+
+export interface ReportDetailResponse {
+  report: {
+    id: string;
+    name: string;
+    currentDate: string;
+  };
+  basis: Record<string, string>;
+  columns: DetailColumn[];
+  items: Record<string, string | number | null>[];
+  page: {
+    limit: number;
+    nextCursor: string | null;
+  };
+}
+
+export interface DashboardOverview {
+  basisDate: string;
+  balanceBasisDate: string;
+  totals: {
+    transactionKrw: number;
+    balanceKrw: number;
+    onboardingCount: number;
+  };
+  upcomingKycCorporations: Record<string, string | number | null>[];
+}
+
 interface ApiErrorResponse {
   error?: {
     code?: string;
@@ -131,4 +163,19 @@ export function runReport(
     method: "POST",
     body: JSON.stringify({ previousDate, currentDate }),
   });
+}
+
+export function getReportSummary(reportId: string): Promise<ReportSummary> {
+  return request<ReportSummary>(`/reports/${reportId}/summary`);
+}
+
+export function getReportDetail(
+  reportId: string,
+  kind: "transactions" | "balances" | "onboarding",
+): Promise<ReportDetailResponse> {
+  return request<ReportDetailResponse>(`/reports/${reportId}/${kind}?limit=50`);
+}
+
+export function getDashboardOverview(): Promise<DashboardOverview> {
+  return request<DashboardOverview>("/dashboard");
 }
