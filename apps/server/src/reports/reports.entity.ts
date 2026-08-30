@@ -18,15 +18,15 @@ export class ReportEntity {
   @Column({ type: 'varchar', length: 20, default: ReportStatus.Draft })
   status!: ReportStatus;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ name: 'previous_date', type: 'date', nullable: true })
   previousDate!: string | null;
 
-  @Column({ type: 'date', nullable: true })
+  @Column({ name: 'current_date', type: 'date', nullable: true })
   currentDate!: string | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }
