@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ReportsController } from './reports.controller.js';
 import { ReportsService } from './reports.service.js';
 
@@ -47,5 +48,40 @@ describe('ReportsController', () => {
     await controller.runReport('rpt_001');
 
     expect(reportsService.runReport).toHaveBeenCalledWith('rpt_001');
+  });
+
+  it('documents report endpoints with Swagger examples for manual API tests', async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [ReportsController],
+      providers: [{ provide: ReportsService, useValue: reportsService }],
+    }).compile();
+    const app = module.createNestApplication();
+
+    await app.init();
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder().build());
+    await app.close();
+
+    expect(document.paths['/reports']?.post?.summary).toBe('Create report');
+    expect(document.paths['/reports/{reportId}/dates']?.patch?.summary).toBe(
+      'Update report dates',
+    );
+    expect(document.paths['/reports/{reportId}/run']?.post?.summary).toBe(
+      'Run report aggregation',
+    );
+    expect(
+      document.paths['/reports/{reportId}/dates']?.patch?.parameters?.some(
+        (parameter) =>
+          parameter.name === 'reportId' && parameter.schema?.example === 'rpt_001',
+      ),
+    ).toBe(true);
+    expect(document.components?.schemas?.CreateReportDto?.properties?.name?.example).toBe(
+      '08.27 실적',
+    );
+    expect(
+      document.components?.schemas?.UpdateReportDatesDto?.properties?.previousDate?.example,
+    ).toBe('2026-07-07');
+    expect(
+      document.components?.schemas?.UpdateReportDatesDto?.properties?.currentDate?.example,
+    ).toBe('2026-08-27');
   });
 });

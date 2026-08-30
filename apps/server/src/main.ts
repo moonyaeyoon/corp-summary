@@ -1,6 +1,7 @@
 import { HttpStatus, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 import { ErrorCode } from './common/enums/error-code.enum.js';
 import { AppException } from './common/exceptions/app.exception.js';
@@ -8,7 +9,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { setupSwagger } from './config/swagger.config.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, new ExpressAdapter());
   const configService = app.get(ConfigService);
   const port = Number(configService.get<string | number>('PORT', 4000));
   const corsOrigin = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');

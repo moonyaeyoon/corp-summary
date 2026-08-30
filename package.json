@@ -8,11 +8,11 @@
   ],
   "scripts": {
     "dev:web": "npm run dev -w apps/web",
-    "dev:api": "npm run start:dev -w apps/api",
+    "dev:api": "npm run start:dev -w apps/server",
     "build:web": "npm run build -w apps/web",
-    "build:api": "npm run build -w apps/api",
+    "build:api": "npm run build -w apps/server",
     "lint:web": "npm run lint -w apps/web",
-    "lint:api": "npm run lint -w apps/api"
+    "lint:api": "npm run lint -w apps/server"
   },
   "keywords": [],
   "author": "",
