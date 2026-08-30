@@ -820,6 +820,7 @@ button:disabled {
 
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .wh-table {
@@ -912,10 +913,116 @@ button:disabled {
   font-size: 13px;
 }
 
+.list-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.list-table th,
+.list-table td {
+  min-width: 118px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-col-corp_nm,
+.list-cell-corp_nm {
+  min-width: 150px;
+  max-width: 180px;
+}
+
+.list-col-transaction_dtm,
+.list-cell-transaction_dtm,
+.list-col-basis_dt,
+.list-cell-basis_dt,
+.list-col-member_join_dtm,
+.list-cell-member_join_dtm,
+.list-col-latest_kyc_dtm,
+.list-cell-latest_kyc_dtm,
+.list-col-next_kyc_dtm,
+.list-cell-next_kyc_dtm,
+.list-col-loaded_at,
+.list-cell-loaded_at {
+  min-width: 148px;
+  max-width: 176px;
+}
+
+.list-col-coin_qty,
+.list-cell-coin_qty,
+.list-col-krw_amt,
+.list-cell-krw_amt,
+.list-col-balance_krw_amt,
+.list-cell-balance_krw_amt {
+  min-width: 150px;
+  max-width: 190px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.list-col-corp_type,
+.list-cell-corp_type,
+.list-col-corp_market_type,
+.list-cell-corp_market_type {
+  min-width: 142px;
+  max-width: 190px;
+}
+
 .empty-cell {
   height: 156px !important;
   color: var(--wh-color-text-secondary) !important;
   text-align: center;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  color: var(--wh-color-text-secondary);
+  font-size: 13px;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-controls button {
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--wh-color-border-default);
+  border-radius: 6px;
+  background: var(--wh-color-bg-surface);
+  color: var(--wh-color-text-primary);
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.pagination-controls button[aria-current="page"] {
+  border-color: var(--wh-color-brand-active);
+  background: var(--wh-color-brand-active);
+  color: white;
+  font-weight: 600;
+}
+
+.pagination-controls button:disabled {
+  color: var(--wh-color-text-muted);
+  opacity: 0.55;
+}
+
+.pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 32px;
+  color: var(--wh-color-text-secondary);
+  font-size: 12px;
 }
 
 .toast {

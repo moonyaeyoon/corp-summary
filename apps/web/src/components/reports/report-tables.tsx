@@ -8,12 +8,33 @@ function formatNumber(value: number): string {
   return Number.isFinite(value) ? value.toLocaleString("ko-KR") : "-";
 }
 
-function formatCellValue(value: string | number | null | undefined): string {
+function formatCellValue(
+  value: string | number | null | undefined,
+  column?: DetailColumn,
+): string {
   if (value === null || value === undefined || value === "") {
     return "-";
   }
 
-  return typeof value === "number" ? formatNumber(value) : value;
+  if (typeof value === "number") {
+    return formatNumber(value);
+  }
+
+  if (
+    column &&
+    (column.dataType === "date" ||
+      column.dataType === "timestamp" ||
+      column.key.endsWith("_dt") ||
+      column.key.endsWith("_dtm"))
+  ) {
+    return value.slice(0, 10);
+  }
+
+  if (/^-?\d+\.\d+$/.test(value)) {
+    return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+
+  return value;
 }
 
 async function copyText(text: string, onCopied?: () => void) {
@@ -251,13 +272,23 @@ export function OverviewPanel({
 
 export function DataList({
   columns,
+  currentPage = 1,
   isLoading = false,
+  onPageChange,
   rows,
+  totalItems = 0,
+  totalPages = 1,
 }: {
   columns: DetailColumn[];
+  currentPage?: number;
   isLoading?: boolean;
+  onPageChange?: (page: number) => void;
   rows: Record<string, string | number | null>[];
+  totalItems?: number;
+  totalPages?: number;
 }) {
+  const pages = buildVisiblePages(currentPage, totalPages);
+
   return (
     <div className="data-list">
       <div className="table-scroll">
@@ -265,7 +296,9 @@ export function DataList({
           <thead>
             <tr>
               {columns.map((column) => (
-                <th key={column.key}>{column.label}</th>
+                <th className={`list-col list-col-${column.key}`} key={column.key}>
+                  {column.label}
+                </th>
               ))}
             </tr>
           </thead>
@@ -279,9 +312,15 @@ export function DataList({
             ) : rows.length > 0 ? (
               rows.map((row, index) => (
                 <tr key={`${row.id ?? "row"}-${index}`}>
-                  {columns.map((column) => (
-                    <td key={column.key}>{formatCellValue(row[column.key])}</td>
-                  ))}
+                  {columns.map((column) => {
+                    const value = formatCellValue(row[column.key], column);
+
+                    return (
+                      <td className={`list-cell list-cell-${column.key}`} key={column.key} title={value}>
+                        {value}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (
@@ -294,6 +333,63 @@ export function DataList({
           </tbody>
         </table>
       </div>
+      <div className="pagination-bar">
+        <span>{totalItems.toLocaleString("ko-KR")}개</span>
+        <div className="pagination-controls">
+          <button
+            disabled={currentPage <= 1 || isLoading}
+            onClick={() => onPageChange?.(currentPage - 1)}
+            type="button"
+          >
+            이전
+          </button>
+          {pages.map((page, index) =>
+            page === "ellipsis" ? (
+              <span className="pagination-ellipsis" key={`ellipsis-${index}`}>
+                ...
+              </span>
+            ) : (
+              <button
+                aria-current={page === currentPage ? "page" : undefined}
+                disabled={isLoading}
+                key={page}
+                onClick={() => onPageChange?.(page)}
+                type="button"
+              >
+                {page}
+              </button>
+            ),
+          )}
+          <button
+            disabled={currentPage >= totalPages || isLoading}
+            onClick={() => onPageChange?.(currentPage + 1)}
+            type="button"
+          >
+            다음
+          </button>
+        </div>
+      </div>
     </div>
   );
+}
+
+function buildVisiblePages(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const sortedPages = [...pages]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((left, right) => left - right);
+
+  return sortedPages.flatMap((page, index) => {
+    const previousPage = sortedPages[index - 1];
+
+    if (previousPage && page - previousPage > 1) {
+      return ["ellipsis" as const, page];
+    }
+
+    return [page];
+  });
 }

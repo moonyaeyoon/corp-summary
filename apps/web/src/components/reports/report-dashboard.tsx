@@ -28,6 +28,11 @@ const detailColumns: Record<string, DetailColumn[]> = {
     { key: "mem_id", label: "회원ID" },
     { key: "market_stage", label: "시장참여단계" },
     { key: "corp_type", label: "법인유형" },
+    { key: "coin_symbol_nm", label: "코인심볼명" },
+    { key: "transaction_dtm", label: "거래일자" },
+    { key: "coin_qty", label: "코인수량" },
+    { key: "krw_amt", label: "원화환산거래금액" },
+    { key: "is_core", label: "core여부" },
   ],
   잔고: [
     { key: "basis_dt", label: "집계 날짜" },
@@ -138,15 +143,6 @@ function Sidebar({
             </div>
           ) : null}
         </div>
-
-        <button className="sidebar-link muted" type="button">
-          <Icon name="checkout" size={24} />
-          <span>법인 리스트</span>
-        </button>
-        <button className="sidebar-link muted" type="button">
-          <Icon name="checkout" size={24} />
-          <span>Checkout</span>
-        </button>
       </nav>
     </aside>
   );
@@ -410,19 +406,27 @@ function ReportsListPanel({
 function ReportContent({
   activeTab,
   detailColumns: activeDetailColumns,
+  detailPage,
   detailRows,
   isDetailLoading,
   onCopied,
   onExcelDownload,
+  onPageChange,
   onTabChange,
   summary,
 }: {
   activeTab: string;
   detailColumns: DetailColumn[];
+  detailPage: {
+    currentPage: number;
+    totalItems: number;
+    totalPages: number;
+  };
   detailRows: Record<string, string | number | null>[];
   isDetailLoading: boolean;
   onCopied: () => void;
   onExcelDownload: () => void;
+  onPageChange: (page: number) => void;
   onTabChange: (tab: string) => void;
   summary: ReportSummary;
 }) {
@@ -441,7 +445,15 @@ function ReportContent({
           <OverviewPanel summary={summary} onCopied={onCopied} />
         </div>
       ) : (
-        <DataList columns={activeDetailColumns} isLoading={isDetailLoading} rows={detailRows} />
+        <DataList
+          columns={activeDetailColumns}
+          currentPage={detailPage.currentPage}
+          isLoading={isDetailLoading}
+          onPageChange={onPageChange}
+          rows={detailRows}
+          totalItems={detailPage.totalItems}
+          totalPages={detailPage.totalPages}
+        />
       )}
     </section>
   );
@@ -457,7 +469,16 @@ export function ReportDashboard() {
   const [dashboard, setDashboard] = useState<DashboardOverview | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [detailData, setDetailData] = useState<
-    Record<string, { columns: DetailColumn[]; rows: Record<string, string | number | null>[] }>
+    Record<
+      string,
+      {
+        columns: DetailColumn[];
+        currentPage: number;
+        rows: Record<string, string | number | null>[];
+        totalItems: number;
+        totalPages: number;
+      }
+    >
   >({});
   const [detailLoadingTab, setDetailLoadingTab] = useState<string | null>(null);
   const [previousDate, setPreviousDate] = useState("2026-07-07");
@@ -569,7 +590,7 @@ export function ReportDashboard() {
     }
   }
 
-  async function loadReportDetail(reportId: string, tab: string) {
+  async function loadReportDetail(reportId: string, tab: string, page = 1) {
     const endpoint = detailEndpointByTab[tab];
 
     if (!endpoint) {
@@ -580,12 +601,15 @@ export function ReportDashboard() {
     setErrorMessage(null);
 
     try {
-      const response = await getReportDetail(reportId, endpoint);
+      const response = await getReportDetail(reportId, endpoint, page);
       setDetailData((current) => ({
         ...current,
         [tab]: {
-          columns: response.columns.length > 0 ? response.columns : detailColumns[tab],
+          columns: detailColumns[tab] ?? response.columns,
+          currentPage: response.page.currentPage,
           rows: response.items,
+          totalItems: response.page.totalItems,
+          totalPages: response.page.totalPages,
         },
       }));
     } catch (error) {
@@ -601,6 +625,14 @@ export function ReportDashboard() {
     if (tab !== "Overview" && selectedReport) {
       await loadReportDetail(selectedReport.id, tab);
     }
+  }
+
+  async function handleDetailPageChange(page: number) {
+    if (!selectedReport || activeTab === "Overview") {
+      return;
+    }
+
+    await loadReportDetail(selectedReport.id, activeTab, page);
   }
 
   async function handleSelectReport(report: Report) {
@@ -660,10 +692,16 @@ export function ReportDashboard() {
             <ReportContent
               activeTab={activeTab}
               detailColumns={detailData[activeTab]?.columns ?? detailColumns[activeTab] ?? []}
+              detailPage={{
+                currentPage: detailData[activeTab]?.currentPage ?? 1,
+                totalItems: detailData[activeTab]?.totalItems ?? 0,
+                totalPages: detailData[activeTab]?.totalPages ?? 1,
+              }}
               detailRows={detailData[activeTab]?.rows ?? []}
               isDetailLoading={detailLoadingTab === activeTab}
               onCopied={() => setToast("복사되었습니다.")}
               onExcelDownload={() => exportSummaryAsExcel(summary)}
+              onPageChange={(page) => void handleDetailPageChange(page)}
               onTabChange={(tab) => void handleTabChange(tab)}
               summary={summary}
             />

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class ListReportDetailsQueryDto {
   @ApiPropertyOptional({
@@ -18,10 +18,14 @@ export class ListReportDetailsQueryDto {
   limit?: number;
 
   @ApiPropertyOptional({
-    description: '다음 페이지 조회용 cursor',
-    required: false,
+    description: '조회할 페이지 번호',
+    default: 1,
+    example: 1,
+    minimum: 1,
   })
   @IsOptional()
-  @IsString()
-  cursor?: string;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 }

@@ -253,7 +253,7 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get report transactions' })
   @ApiParam(reportIdSwaggerParam)
   @ApiQuery({ name: 'limit', required: false, example: 50 })
-  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiOkResponse({
     description: '거래 내역 상세 조회 성공',
     example: {
@@ -268,7 +268,7 @@ export class ReportsController {
       },
       columns: [],
       items: [],
-      page: { limit: 50, nextCursor: null },
+      page: { currentPage: 1, limit: 50, nextCursor: null, totalItems: 100, totalPages: 2 },
     },
   })
   getReportTransactions(
@@ -282,7 +282,7 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get report balances' })
   @ApiParam(reportIdSwaggerParam)
   @ApiQuery({ name: 'limit', required: false, example: 50 })
-  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiOkResponse({
     description: '잔고 상세 조회 성공',
     example: {
@@ -298,7 +298,7 @@ export class ReportsController {
       },
       columns: [],
       items: [],
-      page: { limit: 50, nextCursor: null },
+      page: { currentPage: 1, limit: 50, nextCursor: null, totalItems: 100, totalPages: 2 },
     },
   })
   getReportBalances(
@@ -312,7 +312,7 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get report onboarding' })
   @ApiParam(reportIdSwaggerParam)
   @ApiQuery({ name: 'limit', required: false, example: 50 })
-  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiOkResponse({
     description: '온보딩 상세 조회 성공',
     example: {
@@ -327,7 +327,7 @@ export class ReportsController {
       },
       columns: [],
       items: [],
-      page: { limit: 50, nextCursor: null },
+      page: { currentPage: 1, limit: 50, nextCursor: null, totalItems: 100, totalPages: 2 },
     },
   })
   getReportOnboarding(

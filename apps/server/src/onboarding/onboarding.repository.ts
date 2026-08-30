@@ -92,7 +92,11 @@ export class OnboardingRepository {
     return row?.value ?? '0';
   }
 
-  async findDetailsUntil(currentDate: string, limit: number): Promise<OnboardingDetailRawRow[]> {
+  async findDetailsUntil(
+    currentDate: string,
+    limit: number,
+    offset: number,
+  ): Promise<OnboardingDetailRawRow[]> {
     const endExclusiveDate = getNextDate(currentDate);
 
     return this.onboardingRepository
@@ -130,8 +134,32 @@ export class OnboardingRepository {
       })
       .orderBy('onboarding.latestKycDateTime', 'DESC')
       .addOrderBy('onboarding.corpName', 'ASC')
+      .offset(offset)
       .limit(limit)
       .getRawMany<OnboardingDetailRawRow>();
+  }
+
+  async countDetailsUntil(currentDate: string): Promise<number> {
+    const endExclusiveDate = getNextDate(currentDate);
+
+    return this.onboardingRepository
+      .createQueryBuilder('onboarding')
+      .where(
+        '((onboarding.accountStatus = :activeAccountStatus AND onboarding.kycStatus = :completedKycStatus) OR (onboarding.accountStatus = :dormantAccountStatus AND onboarding.kycStatus = :beforeKycStatus))',
+        {
+          activeAccountStatus: '활성화계정',
+          completedKycStatus: '고객확인완료',
+          dormantAccountStatus: '휴면계정',
+          beforeKycStatus: '고객확인전단계',
+        },
+      )
+      .andWhere('onboarding.latestKycDateTime >= :startDate', {
+        startDate: '2025-01-01',
+      })
+      .andWhere('onboarding.latestKycDateTime < :endExclusiveDate', {
+        endExclusiveDate,
+      })
+      .getCount();
   }
 
   async findUpcomingKyc(

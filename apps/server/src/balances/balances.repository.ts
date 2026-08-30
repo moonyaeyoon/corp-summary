@@ -69,6 +69,7 @@ export class BalancesRepository {
   async findDetailsByBasisDate(
     basisDate: string,
     limit: number,
+    offset: number,
   ): Promise<BalanceDetailRawRow[]> {
     return this.balanceRepository
       .createQueryBuilder('balance')
@@ -87,7 +88,15 @@ export class BalancesRepository {
       .where('balance.basisDt = :basisDate', { basisDate })
       .orderBy('balance.corpName', 'ASC')
       .addOrderBy('balance.coinSymbolName', 'ASC')
+      .offset(offset)
       .limit(limit)
       .getRawMany<BalanceDetailRawRow>();
+  }
+
+  async countDetailsByBasisDate(basisDate: string): Promise<number> {
+    return this.balanceRepository
+      .createQueryBuilder('balance')
+      .where('balance.basisDt = :basisDate', { basisDate })
+      .getCount();
   }
 }

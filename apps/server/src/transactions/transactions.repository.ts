@@ -81,6 +81,7 @@ export class TransactionsRepository {
   async findDetailsUntil(
     currentDate: string,
     limit: number,
+    offset: number,
   ): Promise<TransactionDetailRawRow[]> {
     const endExclusiveDate = getNextDate(currentDate);
 
@@ -108,7 +109,22 @@ export class TransactionsRepository {
       })
       .orderBy('corpTransaction.transactionDateTime', 'DESC')
       .addOrderBy('corpTransaction.custId', 'ASC')
+      .offset(offset)
       .limit(limit)
       .getRawMany<TransactionDetailRawRow>();
+  }
+
+  async countDetailsUntil(currentDate: string): Promise<number> {
+    const endExclusiveDate = getNextDate(currentDate);
+
+    return this.transactionsRepository
+      .createQueryBuilder('corpTransaction')
+      .where('corpTransaction.transactionDateTime >= :startDate', {
+        startDate: '2025-01-01',
+      })
+      .andWhere('corpTransaction.transactionDateTime < :endExclusiveDate', {
+        endExclusiveDate,
+      })
+      .getCount();
   }
 }

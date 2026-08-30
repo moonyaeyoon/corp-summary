@@ -89,8 +89,11 @@ export interface ReportDetailResponse {
   columns: DetailColumn[];
   items: Record<string, string | number | null>[];
   page: {
+    currentPage: number;
     limit: number;
     nextCursor: string | null;
+    totalItems: number;
+    totalPages: number;
   };
 }
 
@@ -172,8 +175,10 @@ export function getReportSummary(reportId: string): Promise<ReportSummary> {
 export function getReportDetail(
   reportId: string,
   kind: "transactions" | "balances" | "onboarding",
+  page = 1,
+  limit = 50,
 ): Promise<ReportDetailResponse> {
-  return request<ReportDetailResponse>(`/reports/${reportId}/${kind}?limit=50`);
+  return request<ReportDetailResponse>(`/reports/${reportId}/${kind}?page=${page}&limit=${limit}`);
 }
 
 export function getDashboardOverview(): Promise<DashboardOverview> {

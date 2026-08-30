@@ -169,7 +169,12 @@ export class ReportsService {
       const report = await this.findReportById(reportId);
       this.assertReportDates(report);
       const limit = query.limit ?? 50;
-      const items = await this.transactionsService.getDetailsUntil(report.currentDate, limit);
+      const page = query.page ?? 1;
+      const { items, totalItems } = await this.transactionsService.getDetailsUntil(
+        report.currentDate,
+        limit,
+        this.toOffset(page, limit),
+      );
 
       return this.toDetailResponse(
         report,
@@ -179,7 +184,7 @@ export class ReportsService {
         },
         TRANSACTION_COLUMNS,
         items,
-        limit,
+        { limit, page, totalItems },
       );
     } catch (error) {
       this.handleUnexpectedError(error);
@@ -194,7 +199,12 @@ export class ReportsService {
       const report = await this.findReportById(reportId);
       this.assertReportDates(report);
       const limit = query.limit ?? 50;
-      const items = await this.balancesService.getDetailsByBasisDate(report.currentDate, limit);
+      const page = query.page ?? 1;
+      const { items, totalItems } = await this.balancesService.getDetailsByBasisDate(
+        report.currentDate,
+        limit,
+        this.toOffset(page, limit),
+      );
 
       return this.toDetailResponse(
         report,
@@ -205,7 +215,7 @@ export class ReportsService {
         },
         BALANCE_COLUMNS,
         items,
-        limit,
+        { limit, page, totalItems },
       );
     } catch (error) {
       this.handleUnexpectedError(error);
@@ -220,7 +230,12 @@ export class ReportsService {
       const report = await this.findReportById(reportId);
       this.assertReportDates(report);
       const limit = query.limit ?? 50;
-      const items = await this.onboardingService.getDetailsUntil(report.currentDate, limit);
+      const page = query.page ?? 1;
+      const { items, totalItems } = await this.onboardingService.getDetailsUntil(
+        report.currentDate,
+        limit,
+        this.toOffset(page, limit),
+      );
 
       return this.toDetailResponse(
         report,
@@ -230,7 +245,7 @@ export class ReportsService {
         },
         ONBOARDING_COLUMNS,
         items,
-        limit,
+        { limit, page, totalItems },
       );
     } catch (error) {
       this.handleUnexpectedError(error);
@@ -482,8 +497,10 @@ export class ReportsService {
     basis: DetailBasis,
     columns: DetailColumn[],
     items: object[],
-    limit: number,
+    pageInfo: { limit: number; page: number; totalItems: number },
   ): ReportDetailResponseDto {
+    const totalPages = Math.max(Math.ceil(pageInfo.totalItems / pageInfo.limit), 1);
+
     return {
       report: {
         id: report.id,
@@ -494,10 +511,17 @@ export class ReportsService {
       columns,
       items,
       page: {
-        limit,
+        currentPage: pageInfo.page,
+        limit: pageInfo.limit,
         nextCursor: null,
+        totalItems: pageInfo.totalItems,
+        totalPages,
       },
     };
+  }
+
+  private toOffset(page: number, limit: number): number {
+    return (page - 1) * limit;
   }
 
   private handleUnexpectedError(error: unknown): never {
@@ -531,8 +555,11 @@ export interface ReportDetailResponseDto {
   columns: DetailColumn[];
   items: object[];
   page: {
+    currentPage: number;
     limit: number;
     nextCursor: string | null;
+    totalItems: number;
+    totalPages: number;
   };
 }
 
@@ -546,10 +573,10 @@ const TRANSACTION_COLUMNS: DetailColumn[] = [
   { key: 'market_stage', label: '시장참여단계', dataType: 'varchar(100)' },
   { key: 'corp_type', label: '법인유형', dataType: 'varchar(200)' },
   { key: 'coin_symbol_nm', label: '코인심볼명', dataType: 'varchar(2000)' },
-  { key: 'transaction_dtm', label: '거래날짜', dataType: 'timestamp' },
+  { key: 'transaction_dtm', label: '거래일시', dataType: 'timestamp' },
   { key: 'coin_qty', label: '코인수량', dataType: 'numeric(38,18)' },
   { key: 'krw_amt', label: '원화환산거래금액', dataType: 'numeric(38,18)' },
-  { key: 'basis_dt', label: '거래날짜', dataType: 'date' },
+  { key: 'basis_dt', label: '거래일자', dataType: 'date' },
   { key: 'is_core', label: 'core여부', dataType: 'varchar(1)' },
 ];
 

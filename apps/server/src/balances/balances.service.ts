@@ -33,7 +33,13 @@ export class BalancesService {
   async getDetailsByBasisDate(
     basisDate: string,
     limit: number,
-  ): Promise<BalanceDetailRawRow[]> {
-    return this.balancesRepository.findDetailsByBasisDate(basisDate, limit);
+    offset: number,
+  ): Promise<{ items: BalanceDetailRawRow[]; totalItems: number }> {
+    const [items, totalItems] = await Promise.all([
+      this.balancesRepository.findDetailsByBasisDate(basisDate, limit, offset),
+      this.balancesRepository.countDetailsByBasisDate(basisDate),
+    ]);
+
+    return { items, totalItems };
   }
 }

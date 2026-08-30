@@ -32,8 +32,14 @@ export class OnboardingService {
   async getDetailsUntil(
     currentDate: string,
     limit: number,
-  ): Promise<OnboardingDetailRawRow[]> {
-    return this.onboardingRepository.findDetailsUntil(currentDate, limit);
+    offset: number,
+  ): Promise<{ items: OnboardingDetailRawRow[]; totalItems: number }> {
+    const [items, totalItems] = await Promise.all([
+      this.onboardingRepository.findDetailsUntil(currentDate, limit, offset),
+      this.onboardingRepository.countDetailsUntil(currentDate),
+    ]);
+
+    return { items, totalItems };
   }
 
   async getUpcomingKyc(

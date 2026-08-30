@@ -32,7 +32,13 @@ export class TransactionsService {
   async getDetailsUntil(
     currentDate: string,
     limit: number,
-  ): Promise<TransactionDetailRawRow[]> {
-    return this.transactionsRepository.findDetailsUntil(currentDate, limit);
+    offset: number,
+  ): Promise<{ items: TransactionDetailRawRow[]; totalItems: number }> {
+    const [items, totalItems] = await Promise.all([
+      this.transactionsRepository.findDetailsUntil(currentDate, limit, offset),
+      this.transactionsRepository.countDetailsUntil(currentDate),
+    ]);
+
+    return { items, totalItems };
   }
 }
