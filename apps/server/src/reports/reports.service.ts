@@ -8,7 +8,7 @@ import { ErrorCode } from '../common/enums/error-code.enum.js';
 import { AppException } from '../common/exceptions/app.exception.js';
 import { OnboardingService } from '../onboarding/onboarding.service.js';
 import { TransactionsService } from '../transactions/transactions.service.js';
-import { formatDateLabel, isDateBefore } from '../utils/date.util.js';
+import { formatDateLabel, isDateBeforeOrEqual } from '../utils/date.util.js';
 import { CreateReportDto } from './dto/create-report.dto.js';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto.js';
 import {
@@ -29,7 +29,7 @@ import {
   SummaryMetricMap,
   sumSummaryGroups,
 } from './report-summary-groups.js';
-import { UpdateReportDatesDto } from './dto/update-report-dates.dto.js';
+import { RunReportDto } from './dto/run-report.dto.js';
 import { UpdateReportDto } from './dto/update-report.dto.js';
 import { ReportResultEntity } from './report-result.entity.js';
 import { ReportEntity, ReportStatus } from './reports.entity.js';
@@ -89,29 +89,6 @@ export class ReportsService {
     }
   }
 
-  async updateReportDates(
-    reportId: string,
-    updateReportDatesDto: UpdateReportDatesDto,
-  ): Promise<ReportResponseDto> {
-    try {
-      const report = await this.findReportById(reportId);
-
-      if (!isDateBefore(updateReportDatesDto.previousDate, updateReportDatesDto.currentDate)) {
-        throw new AppException(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
-      }
-
-      const updatedReport = await this.reportsRepository.updateDates(
-        report,
-        updateReportDatesDto.previousDate,
-        updateReportDatesDto.currentDate,
-      );
-
-      return this.toReportResponse(updatedReport);
-    } catch (error) {
-      this.handleUnexpectedError(error);
-    }
-  }
-
   async deleteReport(reportId: string): Promise<void> {
     try {
       const report = await this.findReportById(reportId);
@@ -122,7 +99,7 @@ export class ReportsService {
     }
   }
 
-  async runReport(reportId: string): Promise<ReportSummaryResponseDto> {
+  async runReport(reportId: string, runReportDto: RunReportDto): Promise<ReportSummaryResponseDto> {
     try {
       const report = await this.findReportById(reportId);
 
@@ -130,19 +107,28 @@ export class ReportsService {
         throw new AppException(HttpStatus.CONFLICT, ErrorCode.REPORT_ALREADY_RUNNING);
       }
 
-      this.assertReportDates(report);
+      if (!isDateBeforeOrEqual(runReportDto.previousDate, runReportDto.currentDate)) {
+        throw new AppException(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
+      }
 
-      await this.reportsRepository.updateStatus(report, ReportStatus.Running);
-      const summary = await this.buildSummary(report);
+      const datedReport = await this.reportsRepository.updateDates(
+        report,
+        runReportDto.previousDate,
+        runReportDto.currentDate,
+      );
+      this.assertReportDates(datedReport);
+
+      await this.reportsRepository.updateStatus(datedReport, ReportStatus.Running);
+      const summary = await this.buildSummary(datedReport);
       const result = await this.reportsRepository.saveResult({
-        reportId: report.id,
+        reportId: datedReport.id,
         summaryTable: summary.summaryTable,
         comparisonTable: summary.comparisonTable,
         sentenceSummary: summary.sentenceSummary,
         sourceDates: summary.sourceDates,
       });
       const completedReport = await this.reportsRepository.updateStatus(
-        report,
+        datedReport,
         ReportStatus.Completed,
       );
       this.assertReportDates(completedReport);

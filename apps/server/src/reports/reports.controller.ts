@@ -25,7 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { CreateReportDto } from './dto/create-report.dto.js';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto.js';
-import { UpdateReportDatesDto } from './dto/update-report-dates.dto.js';
+import { RunReportDto } from './dto/run-report.dto.js';
 import { UpdateReportDto } from './dto/update-report.dto.js';
 import { ReportsService } from './reports.service.js';
 
@@ -137,40 +137,10 @@ export class ReportsController {
     return this.reportsService.deleteReport(reportId);
   }
 
-  @Patch(':reportId/dates')
-  @ApiOperation({ summary: 'Update report dates' })
-  @ApiParam(reportIdSwaggerParam)
-  @ApiBody({ type: UpdateReportDatesDto })
-  @ApiOkResponse({
-    description: '전주/이번주 기준일 저장 성공',
-    example: {
-      id: 'rpt_001',
-      name: '08.27 실적',
-      status: 'DRAFT',
-      previousDate: '2026-07-07',
-      currentDate: '2026-08-27',
-      createdAt: '2026-08-30T12:00:00.000Z',
-      updatedAt: '2026-08-30T12:10:00.000Z',
-    },
-  })
-  @ApiBadRequestResponse({
-    description: '요청 값 검증 실패 또는 previousDate가 currentDate보다 늦음',
-    example: { error: { code: 'VALIDATION_ERROR', message: 'Request validation failed' } },
-  })
-  @ApiNotFoundResponse({
-    description: '리포트 없음',
-    example: { error: { code: 'REPORT_NOT_FOUND', message: 'Report not found' } },
-  })
-  updateReportDates(
-    @Param('reportId') reportId: string,
-    @Body() updateReportDatesDto: UpdateReportDatesDto,
-  ) {
-    return this.reportsService.updateReportDates(reportId, updateReportDatesDto);
-  }
-
   @Post(':reportId/run')
   @ApiOperation({ summary: 'Run report aggregation' })
   @ApiParam(reportIdSwaggerParam)
+  @ApiBody({ type: RunReportDto })
   @ApiOkResponse({
     description: 'Summary 집계 성공',
     example: {
@@ -207,8 +177,8 @@ export class ReportsController {
     },
   })
   @ApiBadRequestResponse({
-    description: '집계에 필요한 기준일 없음',
-    example: { error: { code: 'REPORT_DATE_REQUIRED', message: 'Report dates are required' } },
+    description: '요청 값 검증 실패 또는 previousDate가 currentDate보다 늦음',
+    example: { error: { code: 'VALIDATION_ERROR', message: 'Request validation failed' } },
   })
   @ApiConflictResponse({
     description: '이미 집계 중인 리포트',
@@ -218,8 +188,8 @@ export class ReportsController {
     description: '리포트 없음',
     example: { error: { code: 'REPORT_NOT_FOUND', message: 'Report not found' } },
   })
-  runReport(@Param('reportId') reportId: string) {
-    return this.reportsService.runReport(reportId);
+  runReport(@Param('reportId') reportId: string, @Body() runReportDto: RunReportDto) {
+    return this.reportsService.runReport(reportId, runReportDto);
   }
 
   @Get(':reportId/summary')

@@ -12,7 +12,6 @@ describe('ReportsController', () => {
     listReports: vi.fn(),
     runReport: vi.fn(),
     updateReport: vi.fn(),
-    updateReportDates: vi.fn(),
   };
 
   beforeEach(async () => {
@@ -44,10 +43,14 @@ describe('ReportsController', () => {
 
   it('delegates report run to the service', async () => {
     reportsService.runReport.mockResolvedValue({ report: { id: 'rpt_001' } });
+    const runReportDto = {
+      previousDate: '2026-07-07',
+      currentDate: '2026-08-27',
+    };
 
-    await controller.runReport('rpt_001');
+    await controller.runReport('rpt_001', runReportDto);
 
-    expect(reportsService.runReport).toHaveBeenCalledWith('rpt_001');
+    expect(reportsService.runReport).toHaveBeenCalledWith('rpt_001', runReportDto);
   });
 
   it('documents report endpoints with Swagger examples for manual API tests', async () => {
@@ -62,14 +65,12 @@ describe('ReportsController', () => {
     await app.close();
 
     expect(document.paths['/reports']?.post?.summary).toBe('Create report');
-    expect(document.paths['/reports/{reportId}/dates']?.patch?.summary).toBe(
-      'Update report dates',
-    );
+    expect(document.paths['/reports/{reportId}/dates']).toBeUndefined();
     expect(document.paths['/reports/{reportId}/run']?.post?.summary).toBe(
       'Run report aggregation',
     );
     expect(
-      document.paths['/reports/{reportId}/dates']?.patch?.parameters?.some(
+      document.paths['/reports/{reportId}/run']?.post?.parameters?.some(
         (parameter) =>
           parameter.name === 'reportId' && parameter.schema?.example === 'rpt_001',
       ),
@@ -78,10 +79,10 @@ describe('ReportsController', () => {
       '08.27 실적',
     );
     expect(
-      document.components?.schemas?.UpdateReportDatesDto?.properties?.previousDate?.example,
+      document.components?.schemas?.RunReportDto?.properties?.previousDate?.example,
     ).toBe('2026-07-07');
     expect(
-      document.components?.schemas?.UpdateReportDatesDto?.properties?.currentDate?.example,
+      document.components?.schemas?.RunReportDto?.properties?.currentDate?.example,
     ).toBe('2026-08-27');
   });
 });

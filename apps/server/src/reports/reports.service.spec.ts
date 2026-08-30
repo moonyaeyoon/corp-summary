@@ -104,15 +104,15 @@ describe('ReportsService', () => {
     });
   });
 
-  it('rejects date updates when previousDate is not earlier than currentDate', async () => {
+  it('rejects report run when previousDate is later than currentDate', async () => {
     const repository = createRepositoryMock();
     repository.findById.mockResolvedValue(createReport());
     const service = createService(repository);
 
     await expect(
-      service.updateReportDates('rpt_001', {
-        previousDate: '2026-08-21',
-        currentDate: '2026-08-21',
+      service.runReport('rpt_001', {
+        previousDate: '2026-08-28',
+        currentDate: '2026-08-27',
       }),
     ).rejects.toMatchObject({
       response: {
@@ -122,13 +122,17 @@ describe('ReportsService', () => {
   });
 
   it('runs a report and persists calculated summary result', async () => {
-    const report = createReport({
+    const report = createReport();
+    const datedReport = createReport({
       previousDate: '2026-08-14',
       currentDate: '2026-08-21',
     });
     const repository = createRepositoryMock();
     repository.findById.mockResolvedValue(report);
-    repository.updateStatus.mockResolvedValue(createReport({ ...report, status: ReportStatus.Completed }));
+    repository.updateDates.mockResolvedValue(datedReport);
+    repository.updateStatus
+      .mockResolvedValueOnce(createReport({ ...datedReport, status: ReportStatus.Running }))
+      .mockResolvedValueOnce(createReport({ ...datedReport, status: ReportStatus.Completed }));
     repository.saveResult.mockResolvedValue({
       id: 'res_001',
       reportId: 'rpt_001',
@@ -177,7 +181,12 @@ describe('ReportsService', () => {
       transactionsService,
     });
 
-    await expect(service.runReport('rpt_001')).resolves.toMatchObject({
+    await expect(
+      service.runReport('rpt_001', {
+        previousDate: '2026-08-14',
+        currentDate: '2026-08-21',
+      }),
+    ).resolves.toMatchObject({
       report: {
         id: 'rpt_001',
         status: ReportStatus.Completed,
@@ -185,6 +194,7 @@ describe('ReportsService', () => {
         currentDate: '2026-08-21',
       },
     });
+    expect(repository.updateDates).toHaveBeenCalledWith(report, '2026-08-14', '2026-08-21');
     expect(balancesService.getSummaryMetrics).toHaveBeenNthCalledWith(1, '2026-08-14');
     expect(balancesService.getSummaryMetrics).toHaveBeenNthCalledWith(2, '2026-08-21');
     expect(repository.saveResult).toHaveBeenCalledWith(
@@ -200,19 +210,6 @@ describe('ReportsService', () => {
         }),
       }),
     );
-  });
-
-  it('requires report dates before running aggregation', async () => {
-    const repository = createRepositoryMock();
-    repository.findById.mockResolvedValue(createReport());
-    const service = createService(repository);
-
-    await expect(service.runReport('rpt_001')).rejects.toMatchObject({
-      response: {
-        code: ErrorCode.REPORT_DATE_REQUIRED,
-      },
-      status: HttpStatus.BAD_REQUEST,
-    });
   });
 
   it('throws not found when a report does not exist', async () => {
