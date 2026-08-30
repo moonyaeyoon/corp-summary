@@ -1,5 +1,6 @@
-import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
+import { AppException } from '../common/exceptions/app.exception.js';
 import { ReportEntity, ReportStatus } from './reports.entity.js';
 import { ReportsRepository } from './reports.repository.js';
 import { ReportsService } from './reports.service.js';
@@ -55,9 +56,12 @@ describe('ReportsService', () => {
     repository.findByName.mockResolvedValue(createReport());
     const service = new ReportsService(repository as unknown as ReportsRepository);
 
-    await expect(service.createReport({ name: '08.21 실적' })).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(service.createReport({ name: '08.21 실적' })).rejects.toMatchObject({
+      response: {
+        code: ErrorCode.REPORT_NAME_ALREADY_EXISTS,
+      },
+      status: HttpStatus.CONFLICT,
+    });
   });
 
   it('rejects date updates when previousDate is not earlier than currentDate', async () => {
@@ -73,7 +77,6 @@ describe('ReportsService', () => {
     ).rejects.toMatchObject({
       response: {
         code: ErrorCode.VALIDATION_ERROR,
-        field: 'previousDate',
       },
     });
   });
@@ -119,7 +122,12 @@ describe('ReportsService', () => {
     repository.findById.mockResolvedValue(createReport());
     const service = new ReportsService(repository as unknown as ReportsRepository);
 
-    await expect(service.runReport('rpt_001')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.runReport('rpt_001')).rejects.toMatchObject({
+      response: {
+        code: ErrorCode.REPORT_DATE_REQUIRED,
+      },
+      status: HttpStatus.BAD_REQUEST,
+    });
   });
 
   it('throws not found when a report does not exist', async () => {
@@ -127,7 +135,7 @@ describe('ReportsService', () => {
     repository.findById.mockResolvedValue(null);
     const service = new ReportsService(repository as unknown as ReportsRepository);
 
-    await expect(service.getReportSummary('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getReportSummary('missing')).rejects.toBeInstanceOf(AppException);
   });
 
   it('wraps unexpected repository errors', async () => {
@@ -135,8 +143,11 @@ describe('ReportsService', () => {
     repository.findByName.mockRejectedValue(new Error('db failed'));
     const service = new ReportsService(repository as unknown as ReportsRepository);
 
-    await expect(service.createReport({ name: '08.21 실적' })).rejects.toBeInstanceOf(
-      InternalServerErrorException,
-    );
+    await expect(service.createReport({ name: '08.21 실적' })).rejects.toMatchObject({
+      response: {
+        code: ErrorCode.INTERNAL_ERROR,
+      },
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
   });
 });

@@ -16,7 +16,6 @@ import { ErrorCode } from '../enums/error-code.enum.js';
 interface ExceptionResponseBody {
   code?: ErrorCode | string;
   message?: string | string[];
-  field?: string;
 }
 
 @Catch()
@@ -55,7 +54,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       error: {
         code,
         message,
-        ...(responseBody.field ? { field: responseBody.field } : {}),
       },
     };
   }

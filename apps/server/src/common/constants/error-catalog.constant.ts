@@ -12,6 +12,7 @@ export const HTTP_STATUS_ERROR_CODE_MAP: Partial<Record<number, ErrorCode>> = {
 export const ERROR_CODE_DEFAULT_MESSAGE_MAP: Record<ErrorCode, ErrorMessage> = {
   [ErrorCode.VALIDATION_ERROR]: ErrorMessage.VALIDATION_ERROR,
   [ErrorCode.REPORT_DATE_REQUIRED]: ErrorMessage.REPORT_DATE_REQUIRED,
+  [ErrorCode.REPORT_NAME_ALREADY_EXISTS]: ErrorMessage.REPORT_NAME_ALREADY_EXISTS,
   [ErrorCode.REPORT_NOT_FOUND]: ErrorMessage.REPORT_NOT_FOUND,
   [ErrorCode.REPORT_ALREADY_RUNNING]: ErrorMessage.REPORT_ALREADY_RUNNING,
   [ErrorCode.REPORT_SUMMARY_NOT_FOUND]: ErrorMessage.REPORT_SUMMARY_NOT_FOUND,

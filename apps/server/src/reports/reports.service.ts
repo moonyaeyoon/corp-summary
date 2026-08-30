@@ -1,12 +1,10 @@
 import {
-  BadRequestException,
-  ConflictException,
   HttpException,
+  HttpStatus,
   Injectable,
-  InternalServerErrorException,
-  NotFoundException,
 } from '@nestjs/common';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
+import { AppException } from '../common/exceptions/app.exception.js';
 import { formatDateLabel, isDateBefore } from '../utils/date.util.js';
 import { CreateReportDto } from './dto/create-report.dto.js';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto.js';
@@ -65,11 +63,7 @@ export class ReportsService {
       const duplicate = await this.reportsRepository.findByName(updateReportDto.name);
 
       if (duplicate && duplicate.id !== reportId) {
-        throw new ConflictException({
-          code: ErrorCode.VALIDATION_ERROR,
-          message: 'Report name already exists',
-          field: 'name',
-        });
+        throw new AppException(HttpStatus.CONFLICT, ErrorCode.REPORT_NAME_ALREADY_EXISTS);
       }
 
       report.name = updateReportDto.name;
@@ -88,11 +82,7 @@ export class ReportsService {
       const report = await this.findReportById(reportId);
 
       if (!isDateBefore(updateReportDatesDto.previousDate, updateReportDatesDto.currentDate)) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_ERROR,
-          message: 'previousDate must be earlier than currentDate',
-          field: 'previousDate',
-        });
+        throw new AppException(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR);
       }
 
       const updatedReport = await this.reportsRepository.updateDates(
@@ -122,10 +112,7 @@ export class ReportsService {
       const report = await this.findReportById(reportId);
 
       if (report.status === ReportStatus.Running) {
-        throw new ConflictException({
-          code: ErrorCode.REPORT_ALREADY_RUNNING,
-          message: 'Report is already running',
-        });
+        throw new AppException(HttpStatus.CONFLICT, ErrorCode.REPORT_ALREADY_RUNNING);
       }
 
       this.assertReportDates(report);
@@ -151,10 +138,7 @@ export class ReportsService {
         throw error;
       }
 
-      throw new InternalServerErrorException({
-        code: ErrorCode.REPORT_AGGREGATION_FAILED,
-        message: 'Report aggregation failed',
-      });
+      throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.REPORT_AGGREGATION_FAILED);
     }
   }
 
@@ -164,10 +148,7 @@ export class ReportsService {
       const result = await this.reportsRepository.findLatestResultByReportId(report.id);
 
       if (!result) {
-        throw new NotFoundException({
-          code: ErrorCode.REPORT_SUMMARY_NOT_FOUND,
-          message: 'Report summary not found',
-        });
+        throw new AppException(HttpStatus.NOT_FOUND, ErrorCode.REPORT_SUMMARY_NOT_FOUND);
       }
 
       this.assertReportDates(report);
@@ -182,11 +163,7 @@ export class ReportsService {
     const report = await this.reportsRepository.findByName(name);
 
     if (report) {
-      throw new ConflictException({
-        code: ErrorCode.VALIDATION_ERROR,
-        message: 'Report name already exists',
-        field: 'name',
-      });
+      throw new AppException(HttpStatus.CONFLICT, ErrorCode.REPORT_NAME_ALREADY_EXISTS);
     }
   }
 
@@ -194,10 +171,7 @@ export class ReportsService {
     const report = await this.reportsRepository.findById(reportId);
 
     if (!report) {
-      throw new NotFoundException({
-        code: ErrorCode.REPORT_NOT_FOUND,
-        message: 'Report not found',
-      });
+      throw new AppException(HttpStatus.NOT_FOUND, ErrorCode.REPORT_NOT_FOUND);
     }
 
     return report;
@@ -208,10 +182,7 @@ export class ReportsService {
     currentDate: string;
   } {
     if (!report.previousDate || !report.currentDate) {
-      throw new BadRequestException({
-        code: ErrorCode.REPORT_DATE_REQUIRED,
-        message: 'Report dates are required',
-      });
+      throw new AppException(HttpStatus.BAD_REQUEST, ErrorCode.REPORT_DATE_REQUIRED);
     }
   }
 
@@ -319,9 +290,6 @@ export class ReportsService {
       throw error;
     }
 
-    throw new InternalServerErrorException({
-      code: ErrorCode.INTERNAL_ERROR,
-      message: 'Internal server error',
-    });
+    throw new AppException(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR);
   }
 }
