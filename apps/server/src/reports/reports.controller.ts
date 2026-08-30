@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -29,12 +30,15 @@ import { RunReportDto } from './dto/run-report.dto.js';
 import { UpdateReportDto } from './dto/update-report.dto.js';
 import { ReportsService } from './reports.service.js';
 
+const reportIdExample = '11111111-1111-4111-8111-111111111111';
+
 const reportIdSwaggerParam = {
   name: 'reportId',
   description: '리포트 ID',
   schema: {
     type: 'string',
-    example: 'rpt_001',
+    format: 'uuid',
+    example: reportIdExample,
   },
 };
 
@@ -49,7 +53,7 @@ export class ReportsController {
   @ApiCreatedResponse({
     description: '리포트 생성 성공',
     example: {
-      id: 'rpt_001',
+      id: reportIdExample,
       name: '08.27 실적',
       status: 'DRAFT',
       previousDate: null,
@@ -76,7 +80,7 @@ export class ReportsController {
   @ApiQuery({
     name: 'cursor',
     required: false,
-    example: 'rpt_001',
+    example: reportIdExample,
     description: '다음 페이지 조회용 cursor',
   })
   @ApiOkResponse({
@@ -84,7 +88,7 @@ export class ReportsController {
     example: {
       items: [
         {
-          id: 'rpt_001',
+          id: reportIdExample,
           name: '08.27 실적',
           status: 'COMPLETED',
           previousDate: '2026-07-07',
@@ -107,7 +111,7 @@ export class ReportsController {
   @ApiOkResponse({
     description: '리포트 이름 변경 성공',
     example: {
-      id: 'rpt_001',
+      id: reportIdExample,
       name: '08.27 실적 수정',
       status: 'DRAFT',
       previousDate: null,
@@ -120,7 +124,10 @@ export class ReportsController {
     description: '리포트 없음',
     example: { error: { code: 'REPORT_NOT_FOUND', message: 'Report not found' } },
   })
-  updateReport(@Param('reportId') reportId: string, @Body() updateReportDto: UpdateReportDto) {
+  updateReport(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Body() updateReportDto: UpdateReportDto,
+  ) {
     return this.reportsService.updateReport(reportId, updateReportDto);
   }
 
@@ -133,7 +140,7 @@ export class ReportsController {
     description: '리포트 없음',
     example: { error: { code: 'REPORT_NOT_FOUND', message: 'Report not found' } },
   })
-  deleteReport(@Param('reportId') reportId: string) {
+  deleteReport(@Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string) {
     return this.reportsService.deleteReport(reportId);
   }
 
@@ -145,7 +152,7 @@ export class ReportsController {
     description: 'Summary 집계 성공',
     example: {
       report: {
-        id: 'rpt_001',
+        id: reportIdExample,
         name: '08.27 실적',
         status: 'COMPLETED',
         previousDate: '2026-07-07',
@@ -188,7 +195,10 @@ export class ReportsController {
     description: '리포트 없음',
     example: { error: { code: 'REPORT_NOT_FOUND', message: 'Report not found' } },
   })
-  runReport(@Param('reportId') reportId: string, @Body() runReportDto: RunReportDto) {
+  runReport(
+    @Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string,
+    @Body() runReportDto: RunReportDto,
+  ) {
     return this.reportsService.runReport(reportId, runReportDto);
   }
 
@@ -199,7 +209,7 @@ export class ReportsController {
     description: '저장된 Summary 조회 성공',
     example: {
       report: {
-        id: 'rpt_001',
+        id: reportIdExample,
         name: '08.27 실적',
         status: 'COMPLETED',
         previousDate: '2026-07-07',
@@ -234,7 +244,7 @@ export class ReportsController {
     description: '리포트 또는 Summary 없음',
     example: { error: { code: 'REPORT_SUMMARY_NOT_FOUND', message: 'Report summary not found' } },
   })
-  getReportSummary(@Param('reportId') reportId: string) {
+  getReportSummary(@Param('reportId', new ParseUUIDPipe({ version: '4' })) reportId: string) {
     return this.reportsService.getReportSummary(reportId);
   }
 }

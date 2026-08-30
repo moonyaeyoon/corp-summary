@@ -72,7 +72,8 @@ describe('ReportsController', () => {
     expect(
       document.paths['/reports/{reportId}/run']?.post?.parameters?.some(
         (parameter) =>
-          parameter.name === 'reportId' && parameter.schema?.example === 'rpt_001',
+          parameter.name === 'reportId' &&
+          parameter.schema?.example === '11111111-1111-4111-8111-111111111111',
       ),
     ).toBe(true);
     expect(document.components?.schemas?.CreateReportDto?.properties?.name?.example).toBe(

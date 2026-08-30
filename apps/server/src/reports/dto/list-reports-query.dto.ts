@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 
 export class ListReportsQueryDto {
   @ApiPropertyOptional({
@@ -19,9 +19,10 @@ export class ListReportsQueryDto {
 
   @ApiPropertyOptional({
     description: '다음 페이지 조회용 cursor',
-    example: 'rpt_001',
+    example: '11111111-1111-4111-8111-111111111111',
+    format: 'uuid',
   })
   @IsOptional()
-  @IsString()
+  @IsUUID('4')
   cursor?: string;
 }
