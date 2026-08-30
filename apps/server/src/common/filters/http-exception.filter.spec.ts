@@ -40,7 +40,6 @@ describe('HttpExceptionFilter', () => {
       error: {
         code: ErrorCode.VALIDATION_ERROR,
         message: 'previousDate must be earlier than currentDate',
-        field: 'previousDate',
       },
     });
   });

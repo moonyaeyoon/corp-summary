@@ -1,14 +1,15 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-export function setupSwagger(app: INestApplication): void {
-  const config = new DocumentBuilder()
+export function createSwaggerConfig() {
+  return new DocumentBuilder()
     .setTitle('Corp Summary API')
     .setDescription('Corp Summary backend API documentation')
     .setVersion('1.0')
-    .addServer('/v1')
     .build();
+}
 
-  const document = SwaggerModule.createDocument(app, config);
+export function setupSwagger(app: INestApplication): void {
+  const document = SwaggerModule.createDocument(app, createSwaggerConfig());
   SwaggerModule.setup('docs', app, document);
 }

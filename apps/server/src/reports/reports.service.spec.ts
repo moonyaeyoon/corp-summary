@@ -1,5 +1,10 @@
-import { BadRequestException, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
+import { BalancesService } from '../balances/balances.service.js';
 import { ErrorCode } from '../common/enums/error-code.enum.js';
+import { AppException } from '../common/exceptions/app.exception.js';
+import { OnboardingService } from '../onboarding/onboarding.service.js';
+import { TransactionsService } from '../transactions/transactions.service.js';
+import { SummaryGroupKey, createEmptySummaryMetricMap } from './report-summary-groups.js';
 import { ReportEntity, ReportStatus } from './reports.entity.js';
 import { ReportsRepository } from './reports.repository.js';
 import { ReportsService } from './reports.service.js';
@@ -34,12 +39,48 @@ function createRepositoryMock() {
   } satisfies Partial<Record<keyof ReportsRepository, ReturnType<typeof vi.fn>>>;
 }
 
+function createMetricMap(values: Partial<Record<SummaryGroupKey, number>>) {
+  return {
+    ...createEmptySummaryMetricMap(),
+    ...values,
+  };
+}
+
+function createService(
+  repository: ReturnType<typeof createRepositoryMock>,
+  overrides: {
+    balancesService?: Partial<BalancesService>;
+    onboardingService?: Partial<OnboardingService>;
+    transactionsService?: Partial<TransactionsService>;
+  } = {},
+) {
+  const balancesService = {
+    getSummaryMetrics: vi.fn().mockResolvedValue(createEmptySummaryMetricMap()),
+    ...overrides.balancesService,
+  };
+  const onboardingService = {
+    getSummaryMetrics: vi.fn().mockResolvedValue(createEmptySummaryMetricMap()),
+    ...overrides.onboardingService,
+  };
+  const transactionsService = {
+    getSummaryMetrics: vi.fn().mockResolvedValue(createEmptySummaryMetricMap()),
+    ...overrides.transactionsService,
+  };
+
+  return new ReportsService(
+    repository as unknown as ReportsRepository,
+    balancesService as unknown as BalancesService,
+    onboardingService as unknown as OnboardingService,
+    transactionsService as unknown as TransactionsService,
+  );
+}
+
 describe('ReportsService', () => {
   it('creates a draft report', async () => {
     const repository = createRepositoryMock();
     repository.findByName.mockResolvedValue(null);
     repository.create.mockResolvedValue(createReport());
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const service = createService(repository);
 
     await expect(service.createReport({ name: '08.21 실적' })).resolves.toMatchObject({
       id: 'rpt_001',
@@ -53,44 +94,62 @@ describe('ReportsService', () => {
   it('rejects duplicate report names', async () => {
     const repository = createRepositoryMock();
     repository.findByName.mockResolvedValue(createReport());
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const service = createService(repository);
 
-    await expect(service.createReport({ name: '08.21 실적' })).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    await expect(service.createReport({ name: '08.21 실적' })).rejects.toMatchObject({
+      response: {
+        code: ErrorCode.REPORT_NAME_ALREADY_EXISTS,
+      },
+      status: HttpStatus.CONFLICT,
+    });
   });
 
-  it('rejects date updates when previousDate is not earlier than currentDate', async () => {
+  it('rejects report run when previousDate is later than currentDate', async () => {
     const repository = createRepositoryMock();
     repository.findById.mockResolvedValue(createReport());
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const service = createService(repository);
 
     await expect(
-      service.updateReportDates('rpt_001', {
-        previousDate: '2026-08-21',
-        currentDate: '2026-08-21',
+      service.runReport('rpt_001', {
+        previousDate: '2026-08-28',
+        currentDate: '2026-08-27',
       }),
     ).rejects.toMatchObject({
       response: {
         code: ErrorCode.VALIDATION_ERROR,
-        field: 'previousDate',
       },
     });
   });
 
-  it('runs a report and persists mock summary result', async () => {
-    const report = createReport({
+  it('runs a report and persists calculated summary result', async () => {
+    const report = createReport();
+    const datedReport = createReport({
       previousDate: '2026-08-14',
       currentDate: '2026-08-21',
     });
     const repository = createRepositoryMock();
     repository.findById.mockResolvedValue(report);
-    repository.updateStatus.mockResolvedValue(createReport({ ...report, status: ReportStatus.Completed }));
+    repository.updateDates.mockResolvedValue(datedReport);
+    repository.updateStatus
+      .mockResolvedValueOnce(createReport({ ...datedReport, status: ReportStatus.Running }))
+      .mockResolvedValueOnce(createReport({ ...datedReport, status: ReportStatus.Completed }));
     repository.saveResult.mockResolvedValue({
       id: 'res_001',
       reportId: 'rpt_001',
-      summaryTable: { title: '이번주 실적', rows: [] },
-      comparisonTable: { title: '전주대비', rows: [] },
+      summaryTable: {
+        title: '이번주 실적',
+        previousLabel: '실적 (2026.08.14 기준)',
+        currentLabel: '실적 (2026.08.21 기준)',
+        rows: [],
+      },
+      comparisonTable: {
+        title: '전주대비',
+        unit: {
+          balanceKrw: 'MILLION_KRW',
+          transactionKrw: 'MILLION_KRW',
+        },
+        rows: [],
+      },
       sentenceSummary: { title: '문장요약', lines: [] },
       sourceDates: {
         previousBalanceBasisDate: '2026-08-14',
@@ -98,45 +157,79 @@ describe('ReportsService', () => {
       },
       createdAt: now,
     });
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const balancesService = {
+      getSummaryMetrics: vi
+        .fn()
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 1_000_000 }))
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 2_000_000 })),
+    };
+    const onboardingService = {
+      getSummaryMetrics: vi
+        .fn()
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 1 }))
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 3 })),
+    };
+    const transactionsService = {
+      getSummaryMetrics: vi
+        .fn()
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 4_000_000 }))
+        .mockResolvedValueOnce(createMetricMap({ [SummaryGroupKey.Stage1]: 7_000_000 })),
+    };
+    const service = createService(repository, {
+      balancesService,
+      onboardingService,
+      transactionsService,
+    });
 
-    await expect(service.runReport('rpt_001')).resolves.toMatchObject({
+    await expect(
+      service.runReport('rpt_001', {
+        previousDate: '2026-08-14',
+        currentDate: '2026-08-21',
+      }),
+    ).resolves.toMatchObject({
       report: {
         id: 'rpt_001',
         status: ReportStatus.Completed,
         previousDate: '2026-08-14',
         currentDate: '2026-08-21',
       },
-      summaryTable: {
-        title: '이번주 실적',
-        rows: [],
-      },
     });
-  });
-
-  it('requires report dates before running aggregation', async () => {
-    const repository = createRepositoryMock();
-    repository.findById.mockResolvedValue(createReport());
-    const service = new ReportsService(repository as unknown as ReportsRepository);
-
-    await expect(service.runReport('rpt_001')).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.updateDates).toHaveBeenCalledWith(report, '2026-08-14', '2026-08-21');
+    expect(balancesService.getSummaryMetrics).toHaveBeenNthCalledWith(1, '2026-08-14');
+    expect(balancesService.getSummaryMetrics).toHaveBeenNthCalledWith(2, '2026-08-21');
+    expect(repository.saveResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summaryTable: expect.objectContaining({
+          rows: expect.arrayContaining([
+            expect.objectContaining({
+              corpType: '1단계',
+              previous: expect.objectContaining({ balanceKrw: 1_000_000 }),
+              current: expect.objectContaining({ balanceKrw: 2_000_000 }),
+            }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it('throws not found when a report does not exist', async () => {
     const repository = createRepositoryMock();
     repository.findById.mockResolvedValue(null);
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const service = createService(repository);
 
-    await expect(service.getReportSummary('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.getReportSummary('missing')).rejects.toBeInstanceOf(AppException);
   });
 
   it('wraps unexpected repository errors', async () => {
     const repository = createRepositoryMock();
     repository.findByName.mockRejectedValue(new Error('db failed'));
-    const service = new ReportsService(repository as unknown as ReportsRepository);
+    const service = createService(repository);
 
-    await expect(service.createReport({ name: '08.21 실적' })).rejects.toBeInstanceOf(
-      InternalServerErrorException,
-    );
+    await expect(service.createReport({ name: '08.21 실적' })).rejects.toMatchObject({
+      response: {
+        code: ErrorCode.INTERNAL_ERROR,
+      },
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+    });
   });
 });
