@@ -9,6 +9,7 @@ import {
   type ReportSummary,
 } from "@/lib/reports-api";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DatePicker } from "./date-picker";
 import { Icon } from "./icon";
 import { DataList, MainTabs, OverviewPanel, type DataColumn } from "./report-tables";
 
@@ -188,19 +189,45 @@ function DateField({
   onChange: (value: string) => void;
   value: string;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <label className="date-field">
+    <div className="date-field">
       <span>{label}</span>
       <div className="date-input-wrap">
         <Icon name="calendar" />
-        <input onChange={(event) => onChange(event.target.value)} type="date" value={value} />
+        <button
+          className={value ? "date-value-button has-value" : "date-value-button"}
+          onClick={() => setIsOpen((current) => !current)}
+          type="button"
+        >
+          {value || "Choose Date"}
+        </button>
         {value ? (
-          <button onClick={() => onChange("")} title="날짜 지우기" type="button">
+          <button
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+            title="날짜 지우기"
+            type="button"
+          >
             <Icon name="clear" />
           </button>
         ) : null}
       </div>
-    </label>
+      {isOpen ? (
+        <div className="date-picker-popover">
+          <DatePicker
+            onChange={(nextValue) => {
+              onChange(nextValue);
+              setIsOpen(false);
+            }}
+            value={value}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 

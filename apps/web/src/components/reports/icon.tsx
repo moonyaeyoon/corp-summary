@@ -5,6 +5,8 @@ const iconSrc = {
   chart: "/assets/reports/icon-chart.svg",
   checkout: "/assets/reports/icon-checkout.svg",
   chevronDown: "/assets/reports/icon-chevron-down.svg",
+  chevronLeft: "/assets/reports/icon-chevron-left.svg",
+  chevronRight: "/assets/reports/icon-chevron-right.svg",
   clear: "/assets/reports/icon-clear.svg",
   copy: "/assets/reports/icon-copy.svg",
   download: "/assets/reports/icon-download.svg",

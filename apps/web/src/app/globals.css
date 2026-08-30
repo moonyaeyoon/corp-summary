@@ -239,6 +239,7 @@ button:disabled {
 }
 
 .date-field {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -261,13 +262,140 @@ button:disabled {
   padding: 8px 15px;
 }
 
-.date-input-wrap input {
+.date-input-wrap > button:not(.date-value-button) {
+  width: 16px;
+  height: 16px;
+}
+
+.date-value-button {
+  display: block;
   min-width: 0;
   flex: 1;
   border: 0;
+  background: transparent;
   outline: 0;
-  color: var(--wh-color-text-primary);
+  color: #bbbbbb;
   font-size: 15px;
+  padding: 0;
+  text-align: left;
+}
+
+.date-value-button.has-value {
+  color: var(--wh-color-text-primary);
+}
+
+.date-picker-popover {
+  position: absolute;
+  top: 84px;
+  left: 0;
+  z-index: 5;
+}
+
+.pick-date {
+  display: flex;
+  width: 340px;
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: 12px;
+  background: var(--wh-color-bg-surface);
+  box-shadow: 0 0 10px rgb(191 191 191 / 25%);
+  padding-bottom: 20px;
+}
+
+.pick-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.pick-date-header strong {
+  color: #454545;
+  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.month-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: white;
+  padding: 0;
+}
+
+.month-button:hover {
+  background: var(--wh-color-bg-subtle);
+}
+
+.weekday-grid,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 36px);
+  justify-content: space-between;
+  padding-right: 24px;
+  padding-left: 24px;
+}
+
+.weekday-grid {
+  align-items: center;
+  height: 44px;
+}
+
+.weekday-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: #737373;
+  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.calendar-grid {
+  row-gap: 8px;
+}
+
+.calendar-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 18px;
+  background: white;
+  color: #454545;
+  font-family: Inter, Pretendard, "Noto Sans KR", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 0;
+}
+
+.calendar-day:hover {
+  background: var(--wh-color-bg-subtle);
+}
+
+.calendar-day.outside-month {
+  color: #c5c5c5;
+}
+
+.calendar-day.today {
+  color: #5598ff;
+}
+
+.calendar-day.selected {
+  background: #5598ff;
+  color: white;
 }
 
 .primary-button,
