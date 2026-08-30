@@ -10,6 +10,7 @@ const iconSrc = {
   clear: "/assets/reports/icon-clear.svg",
   copy: "/assets/reports/icon-copy.svg",
   download: "/assets/reports/icon-download.svg",
+  questions: "/assets/reports/icon-questions.svg",
 } as const;
 
 type IconName = keyof typeof iconSrc;

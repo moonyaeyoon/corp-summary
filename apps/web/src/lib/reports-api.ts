@@ -108,6 +108,23 @@ export interface DashboardOverview {
   upcomingKycCorporations: Record<string, string | number | null>[];
 }
 
+export interface SqlGuideResponse {
+  answer: string;
+  sql: string | null;
+  usedTables: string[];
+  cautions: string[];
+  isSafeSelect: boolean;
+  raw: string;
+  queryResult?: {
+    executed: boolean;
+    columns: string[];
+    executedSql: string | null;
+    rows: Record<string, string | number | boolean | null>[];
+    rowCount: number;
+    error: string | null;
+  };
+}
+
 interface ApiErrorResponse {
   error?: {
     code?: string;
@@ -183,4 +200,11 @@ export function getReportDetail(
 
 export function getDashboardOverview(): Promise<DashboardOverview> {
   return request<DashboardOverview>("/dashboard");
+}
+
+export function createSqlGuide(question: string, dialect: "postgres" | "redshift" = "postgres"): Promise<SqlGuideResponse> {
+  return request<SqlGuideResponse>("/ai/sql-guide", {
+    method: "POST",
+    body: JSON.stringify({ question, dialect }),
+  });
 }
