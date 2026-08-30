@@ -4,7 +4,10 @@ import {
   createEmptySummaryMetricMap,
   resolveSummaryGroupKey,
 } from '../reports/report-summary-groups.js';
-import { OnboardingRepository } from './onboarding.repository.js';
+import {
+  OnboardingDetailRawRow,
+  OnboardingRepository,
+} from './onboarding.repository.js';
 
 @Injectable()
 export class OnboardingService {
@@ -20,5 +23,29 @@ export class OnboardingService {
     }
 
     return metrics;
+  }
+
+  async getTotalCountUntil(currentDate: string): Promise<number> {
+    return Number(await this.onboardingRepository.countOnboardingUntil(currentDate));
+  }
+
+  async getDetailsUntil(
+    currentDate: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: OnboardingDetailRawRow[]; totalItems: number }> {
+    const [items, totalItems] = await Promise.all([
+      this.onboardingRepository.findDetailsUntil(currentDate, limit, offset),
+      this.onboardingRepository.countDetailsUntil(currentDate),
+    ]);
+
+    return { items, totalItems };
+  }
+
+  async getUpcomingKyc(
+    basisDate: string,
+    limit: number,
+  ): Promise<OnboardingDetailRawRow[]> {
+    return this.onboardingRepository.findUpcomingKyc(basisDate, limit);
   }
 }

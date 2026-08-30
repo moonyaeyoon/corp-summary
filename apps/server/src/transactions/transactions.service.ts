@@ -4,7 +4,10 @@ import {
   createEmptySummaryMetricMap,
   resolveSummaryGroupKey,
 } from '../reports/report-summary-groups.js';
-import { TransactionsRepository } from './transactions.repository.js';
+import {
+  TransactionDetailRawRow,
+  TransactionsRepository,
+} from './transactions.repository.js';
 
 @Injectable()
 export class TransactionsService {
@@ -20,5 +23,22 @@ export class TransactionsService {
     }
 
     return metrics;
+  }
+
+  async getTotalAmountUntil(currentDate: string): Promise<number> {
+    return Number(await this.transactionsRepository.sumTransactionAmountUntil(currentDate));
+  }
+
+  async getDetailsUntil(
+    currentDate: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ items: TransactionDetailRawRow[]; totalItems: number }> {
+    const [items, totalItems] = await Promise.all([
+      this.transactionsRepository.findDetailsUntil(currentDate, limit, offset),
+      this.transactionsRepository.countDetailsUntil(currentDate),
+    ]);
+
+    return { items, totalItems };
   }
 }

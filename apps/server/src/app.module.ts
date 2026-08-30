@@ -4,6 +4,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
 import { BalancesModule } from './balances/balances.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { OnboardingModule } from './onboarding/onboarding.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { TransactionsModule } from './transactions/transactions.module.js';
@@ -15,6 +16,7 @@ import { TransactionsModule } from './transactions/transactions.module.js';
       envFilePath: '.env',
     }),
     DatabaseModule,
+    DashboardModule,
     ReportsModule,
     TransactionsModule,
     OnboardingModule,

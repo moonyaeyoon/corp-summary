@@ -1,0 +1,395 @@
+"use client";
+
+import { buildSummaryClipboardText } from "@/lib/report-export";
+import type { ComparisonTableRow, DetailColumn, ReportSummary, SummaryTableRow } from "@/lib/reports-api";
+import { Icon } from "./icon";
+
+function formatNumber(value: number): string {
+  return Number.isFinite(value) ? value.toLocaleString("ko-KR") : "-";
+}
+
+function formatCellValue(
+  value: string | number | null | undefined,
+  column?: DetailColumn,
+): string {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (typeof value === "number") {
+    return formatNumber(value);
+  }
+
+  if (
+    column &&
+    (column.dataType === "date" ||
+      column.dataType === "timestamp" ||
+      column.key.endsWith("_dt") ||
+      column.key.endsWith("_dtm"))
+  ) {
+    return value.slice(0, 10);
+  }
+
+  if (/^-?\d+\.\d+$/.test(value)) {
+    return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+
+  return value;
+}
+
+async function copyText(text: string, onCopied?: () => void) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  }
+
+  onCopied?.();
+}
+
+function CopyButton({ text, onCopied }: { text: string; onCopied?: () => void }) {
+  return (
+    <button className="icon-button" onClick={() => void copyText(text, onCopied)} title="복사" type="button">
+      <Icon name="copy" />
+    </button>
+  );
+}
+
+function buildWeeklyText(rows: SummaryTableRow[]): string {
+  return rows
+    .map((row) =>
+      [
+        row.corpType,
+        row.targetGroup || "-",
+        row.current.onboardingCount,
+        row.current.balanceKrw,
+        row.current.transactionKrw,
+      ].join("\t"),
+    )
+    .join("\n");
+}
+
+function buildComparisonText(rows: ComparisonTableRow[]): string {
+  return rows
+    .map((row) =>
+      [
+        row.label,
+        row.total,
+        row.stage1,
+        row.stage2,
+        row.stage3,
+        row.etc,
+        row.balanceMillionKrw,
+        row.transactionMillionKrw,
+      ].join("\t"),
+    )
+    .join("\n");
+}
+
+export function MainTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: string;
+  onChange: (tab: string) => void;
+}) {
+  const tabs = ["Overview", "거래 내역", "잔고", "온보딩"];
+
+  return (
+    <div className="main-tabs" role="tablist">
+      {tabs.map((tab) => (
+        <button
+          aria-selected={activeTab === tab}
+          className="main-tab"
+          key={tab}
+          onClick={() => onChange(tab)}
+          role="tab"
+          type="button"
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function WeeklyPerformanceTable({
+  summary,
+  onCopied,
+}: {
+  summary: ReportSummary;
+  onCopied?: () => void;
+}) {
+  const rows = summary.summaryTable.rows;
+  const total = rows.reduce(
+    (acc, row) => ({
+      current: {
+        onboardingCount: acc.current.onboardingCount + row.current.onboardingCount,
+        balanceKrw: acc.current.balanceKrw + row.current.balanceKrw,
+        transactionKrw: acc.current.transactionKrw + row.current.transactionKrw,
+      },
+    }),
+    {
+      current: { onboardingCount: 0, balanceKrw: 0, transactionKrw: 0 },
+    },
+  );
+
+  return (
+    <section className="summary-section">
+      <div className="section-heading">
+        <h3>{summary.summaryTable.title}</h3>
+        <CopyButton text={buildWeeklyText(rows)} onCopied={onCopied} />
+      </div>
+      <div className="table-scroll">
+        <table className="wh-table weekly-table">
+          <thead>
+            <tr>
+              <th>법인 유형</th>
+              <th>
+                타겟
+                <br />
+                구분
+              </th>
+              <th>온보딩수(개)</th>
+              <th>예치금(원)</th>
+              <th>거래대금(원)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.corpType}-${row.targetGroup}-${index}`}>
+                <td>{row.corpType}</td>
+                <td>{row.targetGroup || "-"}</td>
+                <td className="number-cell">{formatNumber(row.current.onboardingCount)}</td>
+                <td className="number-cell">{formatNumber(row.current.balanceKrw)}</td>
+                <td className="number-cell">{formatNumber(row.current.transactionKrw)}</td>
+              </tr>
+            ))}
+            <tr className="total-row">
+              <td>합계</td>
+              <td>-</td>
+              <td className="number-cell">{formatNumber(total.current.onboardingCount)}</td>
+              <td className="number-cell">{formatNumber(total.current.balanceKrw)}</td>
+              <td className="number-cell">{formatNumber(total.current.transactionKrw)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function ComparisonTable({
+  summary,
+  onCopied,
+}: {
+  summary: ReportSummary;
+  onCopied?: () => void;
+}) {
+  return (
+    <section className="summary-section">
+      <div className="section-heading">
+        <h3>{summary.comparisonTable.title}</h3>
+        <CopyButton text={buildComparisonText(summary.comparisonTable.rows)} onCopied={onCopied} />
+      </div>
+      <div className="table-scroll">
+        <table className="wh-table comparison-table">
+          <thead>
+            <tr>
+              <th>일자</th>
+              <th>합계</th>
+              <th>1단계</th>
+              <th>2단계</th>
+              <th>3단계</th>
+              <th>기타(해외법인)</th>
+              <th>예치금(백만원)</th>
+              <th>거래대금(백만원)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.comparisonTable.rows.map((row) => (
+              <tr className={row.isDiff ? "total-row" : undefined} key={row.label}>
+                <td>{row.label}</td>
+                <td className="number-cell">{formatNumber(row.total)}</td>
+                <td className="number-cell">{formatNumber(row.stage1)}</td>
+                <td className="number-cell">{formatNumber(row.stage2)}</td>
+                <td className="number-cell">{formatNumber(row.stage3)}</td>
+                <td className="number-cell">{formatNumber(row.etc)}</td>
+                <td className="number-cell">{formatNumber(row.balanceMillionKrw)}</td>
+                <td className="number-cell">{formatNumber(row.transactionMillionKrw)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function SentenceSummary({
+  summary,
+  onCopied,
+}: {
+  summary: ReportSummary;
+  onCopied?: () => void;
+}) {
+  return (
+    <section className="summary-section sentence-section">
+      <div className="section-heading">
+        <h3>{summary.sentenceSummary.title}</h3>
+        <CopyButton text={summary.sentenceSummary.lines.join("\n")} onCopied={onCopied} />
+      </div>
+      <div className="sentence-lines">
+        {summary.sentenceSummary.lines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
+      <div className="section-divider" />
+    </section>
+  );
+}
+
+export function OverviewPanel({
+  summary,
+  onCopied,
+}: {
+  summary: ReportSummary;
+  onCopied?: () => void;
+}) {
+  return (
+    <>
+      <WeeklyPerformanceTable summary={summary} onCopied={onCopied} />
+      <ComparisonTable summary={summary} onCopied={onCopied} />
+      <SentenceSummary summary={summary} onCopied={onCopied} />
+      <button
+        className="copy-all-button"
+        onClick={() => void copyText(buildSummaryClipboardText(summary), onCopied)}
+        type="button"
+      >
+        전체 복사
+      </button>
+    </>
+  );
+}
+
+export function DataList({
+  columns,
+  currentPage = 1,
+  isLoading = false,
+  onPageChange,
+  rows,
+  totalItems = 0,
+  totalPages = 1,
+}: {
+  columns: DetailColumn[];
+  currentPage?: number;
+  isLoading?: boolean;
+  onPageChange?: (page: number) => void;
+  rows: Record<string, string | number | null>[];
+  totalItems?: number;
+  totalPages?: number;
+}) {
+  const pages = buildVisiblePages(currentPage, totalPages);
+
+  return (
+    <div className="data-list">
+      <div className="table-scroll">
+        <table className="wh-table list-table">
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th className={`list-col list-col-${column.key}`} key={column.key}>
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td className="empty-cell" colSpan={Math.max(columns.length, 1)}>
+                  데이터를 불러오는 중입니다.
+                </td>
+              </tr>
+            ) : rows.length > 0 ? (
+              rows.map((row, index) => (
+                <tr key={`${row.id ?? "row"}-${index}`}>
+                  {columns.map((column) => {
+                    const value = formatCellValue(row[column.key], column);
+
+                    return (
+                      <td className={`list-cell list-cell-${column.key}`} key={column.key} title={value}>
+                        {value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="empty-cell" colSpan={Math.max(columns.length, 1)}>
+                  조회된 데이터가 없습니다.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="pagination-bar">
+        <span>{totalItems.toLocaleString("ko-KR")}개</span>
+        <div className="pagination-controls">
+          <button
+            disabled={currentPage <= 1 || isLoading}
+            onClick={() => onPageChange?.(currentPage - 1)}
+            type="button"
+          >
+            이전
+          </button>
+          {pages.map((page, index) =>
+            page === "ellipsis" ? (
+              <span className="pagination-ellipsis" key={`ellipsis-${index}`}>
+                ...
+              </span>
+            ) : (
+              <button
+                aria-current={page === currentPage ? "page" : undefined}
+                disabled={isLoading}
+                key={page}
+                onClick={() => onPageChange?.(page)}
+                type="button"
+              >
+                {page}
+              </button>
+            ),
+          )}
+          <button
+            disabled={currentPage >= totalPages || isLoading}
+            onClick={() => onPageChange?.(currentPage + 1)}
+            type="button"
+          >
+            다음
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildVisiblePages(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const pages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+  const sortedPages = [...pages]
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((left, right) => left - right);
+
+  return sortedPages.flatMap((page, index) => {
+    const previousPage = sortedPages[index - 1];
+
+    if (previousPage && page - previousPage > 1) {
+      return ["ellipsis" as const, page];
+    }
+
+    return [page];
+  });
+}
