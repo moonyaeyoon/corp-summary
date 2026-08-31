@@ -8,6 +8,19 @@ import { AppException } from './common/exceptions/app.exception.js';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js';
 import { setupSwagger } from './config/swagger.config.js';
 
+function parseCorsOrigin(value: string): boolean | string | string[] {
+  if (value === '*') {
+    return true;
+  }
+
+  const origins = value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length > 1 ? origins : origins[0] ?? value;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter());
   const configService = app.get(ConfigService);
@@ -16,7 +29,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
   app.enableCors({
-    origin: corsOrigin,
+    origin: parseCorsOrigin(corsOrigin),
     credentials: true,
   });
   app.useGlobalPipes(

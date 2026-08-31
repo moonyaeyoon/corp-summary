@@ -132,10 +132,26 @@ interface ApiErrorResponse {
   };
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/v1";
+function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const desktopConfig = (
+      window as Window & {
+        corpSummaryConfig?: {
+          apiBaseUrl?: string;
+        };
+      }
+    ).corpSummaryConfig;
+
+    if (desktopConfig?.apiBaseUrl) {
+      return desktopConfig.apiBaseUrl;
+    }
+  }
+
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/v1";
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",

@@ -4,6 +4,10 @@ build/
 .next/
 coverage/
 *.tsbuildinfo
+apps/desktop/.bundle/
+apps/desktop/release/
+*.gguf
+*.gguf.zip
 
 .env
 .env.*

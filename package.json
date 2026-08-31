@@ -12,7 +12,11 @@
     "build:web": "npm run build -w apps/web",
     "build:api": "npm run build -w apps/server",
     "lint:web": "npm run lint -w apps/web",
-    "lint:api": "npm run lint -w apps/server"
+    "lint:api": "npm run lint -w apps/server",
+    "desktop:dev": "npm run dev -w desktop",
+    "desktop:pack": "npm run pack -w desktop",
+    "desktop:dist:mac": "npm run dist:mac -w desktop",
+    "desktop:dist:win": "npm run dist:win -w desktop"
   },
   "keywords": [],
   "author": "",

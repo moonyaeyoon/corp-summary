@@ -15,9 +15,6 @@ const SQL_PLACEHOLDER_PATTERN = /(:[a-zA-Z_][a-zA-Z0-9_]*|\$\{[^}]+})/;
 
 @Injectable()
 export class AiService {
-  private readonly guidePath = join(process.cwd(), 'resources/ai/guide_current.md');
-  private readonly schemaPath = join(process.cwd(), 'resources/ai/schema_current.md');
-
   constructor(
     private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
@@ -76,9 +73,15 @@ export class AiService {
   }
 
   private async buildPrompt(question: string, dialect: 'postgres' | 'redshift'): Promise<string> {
+    const guidePath =
+      this.configService.get<string>('AI_GUIDE_PATH') ??
+      join(process.cwd(), 'resources/ai/guide_current.md');
+    const schemaPath =
+      this.configService.get<string>('AI_SCHEMA_PATH') ??
+      join(process.cwd(), 'resources/ai/schema_current.md');
     const [guide, schema] = await Promise.all([
-      readFile(this.guidePath, 'utf8'),
-      readFile(this.schemaPath, 'utf8'),
+      readFile(guidePath, 'utf8'),
+      readFile(schemaPath, 'utf8'),
     ]);
 
     return [
