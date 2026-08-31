@@ -12,6 +12,27 @@ import { SqlGuideQueryResultDto, SqlGuideResponseDto } from './dto/sql-guide-res
 const FORBIDDEN_SQL_PATTERN =
   /\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|merge|call|execute|copy)\b/i;
 const SQL_PLACEHOLDER_PATTERN = /(:[a-zA-Z_][a-zA-Z0-9_]*|\$\{[^}]+})/;
+const ANSWER_ID_COLUMNS = ['cust_id', 'mem_id'];
+const COLUMN_LABEL_MAP: Record<string, string> = {
+  account_status: '계정상태',
+  balance_krw_amt: '원화환산잔고',
+  basis_dt: '기준일',
+  coin_qty: '코인수량',
+  corp_market_type: '법인유형',
+  corp_nm: '법인이름',
+  corp_type: '법인유형',
+  cust_id: 'cust_id',
+  inout_type: '입출금구분',
+  is_core: 'core여부',
+  krw_amt: '원화환산거래금액',
+  kyc_status: '고객확인상태',
+  latest_kyc_dtm: '마지막고객확인날짜',
+  market_stage: '시장참여단계',
+  mem_id: 'mem_id',
+  next_kyc_dtm: '다음고객확인날짜',
+  transaction_dtm: '거래일시',
+  transaction_type: '구분',
+};
 
 @Injectable()
 export class AiService {
@@ -63,10 +84,15 @@ export class AiService {
       resolvedQueryResult,
     );
     const finalAnswer = await this.runLlama(llamaPath, modelPath, finalAnswerPrompt);
+    const normalizedAnswer = this.normalizeFinalAnswer(
+      dto.question,
+      finalAnswer,
+      resolvedQueryResult,
+    );
 
     return {
       ...draftResponse,
-      answer: finalAnswer.trim() || this.createFallbackAnswer(resolvedQueryResult),
+      answer: normalizedAnswer,
       raw: [raw, '', '<DB_RESULT_ANSWER>', finalAnswer.trim(), '</DB_RESULT_ANSWER>'].join('\n'),
       queryResult: resolvedQueryResult,
     };
@@ -132,7 +158,9 @@ export class AiService {
       'Answer the user using only the DB_RESULT rows below.',
       'Do not invent numbers, names, dates, or facts.',
       'If DB_RESULT is empty, say that there is no matching data in the connected local DB.',
-      'Keep the answer concise.',
+      'Return only one concise natural Korean sentence.',
+      'Do not include SQL, DB_RESULT, EXECUTED_SQL, XML tags, JSON, markdown tables, or pipe-separated rows.',
+      'The app displays SQL, query rows, and used tables separately.',
       '',
       '<USER_QUESTION>',
       question,
@@ -208,22 +236,23 @@ export class AiService {
           return;
         }
 
-        resolve(stdout.trim() || stderr.trim());
+        resolve(this.cleanLlamaOutput(stdout.trim() || stderr.trim(), prompt));
       });
     });
   }
 
   private toResponse(raw: string): SqlGuideResponseDto {
-    const sql = this.extractSection(raw, 'SQL');
+    const cleanedRaw = this.cleanLlamaOutput(raw);
+    const sql = this.extractSection(cleanedRaw, 'SQL');
     const normalizedSql = sql && sql.toUpperCase() !== 'NONE' ? this.stripSqlFence(sql) : null;
 
     return {
-      answer: this.extractSection(raw, 'ANSWER') || raw,
+      answer: this.extractSection(cleanedRaw, 'ANSWER') || cleanedRaw,
       sql: normalizedSql,
-      usedTables: this.parseListSection(this.extractSection(raw, 'USED_TABLES')),
-      cautions: this.parseListSection(this.extractSection(raw, 'CAUTIONS')),
+      usedTables: this.parseListSection(this.extractSection(cleanedRaw, 'USED_TABLES')),
+      cautions: this.parseListSection(this.extractSection(cleanedRaw, 'CAUTIONS')),
       isSafeSelect: normalizedSql ? this.isSafeSelect(normalizedSql) : true,
-      raw,
+      raw: cleanedRaw,
     };
   }
 
@@ -289,6 +318,40 @@ export class AiService {
     const match = raw.match(pattern);
 
     return match?.[1]?.trim() ?? '';
+  }
+
+  private cleanLlamaOutput(raw: string, prompt?: string): string {
+    let output = this.stripAnsi(raw).trim();
+
+    if (prompt && output.includes(prompt)) {
+      output = output.slice(output.lastIndexOf(prompt) + prompt.length);
+    }
+
+    const markers = ['</DB_RESULT>', '</USER_QUESTION>', '</SCHEMA>'];
+    const markerIndex = markers.reduce((latestIndex, marker) => {
+      const index = output.lastIndexOf(marker);
+
+      return index > latestIndex ? index + marker.length : latestIndex;
+    }, -1);
+
+    if (markerIndex >= 0) {
+      output = output.slice(markerIndex);
+    }
+
+    output = output
+      .replace(/\bloading model\.\.\.[\s\S]*?available commands:[\s\S]*?(?=\n\s*>|\nANSWER:|\nSQL:|$)/i, '')
+      .replace(/\n?\s*>\s*/g, '\n')
+      .replace(/\n?Exiting\.\.\.\s*$/i, '')
+      .trim();
+
+    return output;
+  }
+
+  private stripAnsi(value: string): string {
+    const escapeCharacter = String.fromCharCode(27);
+    const ansiPattern = new RegExp(`${escapeCharacter}\\[[0-?]*[ -/]*[@-~]`, 'g');
+
+    return value.replace(ansiPattern, '');
   }
 
   private stripSqlFence(sql: string): string {
@@ -380,6 +443,141 @@ export class AiService {
     }
 
     return JSON.stringify(value);
+  }
+
+  private normalizeFinalAnswer(
+    question: string,
+    finalAnswer: string,
+    queryResult: SqlGuideQueryResultDto,
+  ): string {
+    const cleanedAnswer = this.cleanLlamaOutput(finalAnswer);
+    const answerSection = this.extractSection(cleanedAnswer, 'ANSWER');
+    const candidate = (answerSection || cleanedAnswer)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !this.isRawMarkerLine(line))
+      .join(' ')
+      .trim();
+
+    if (!candidate || this.isRawLikeAnswer(candidate)) {
+      return this.createNaturalAnswerFromQueryResult(question, queryResult);
+    }
+
+    return candidate;
+  }
+
+  private isRawMarkerLine(line: string): boolean {
+    return /<\/?(DB_RESULT|EXECUTED_SQL|USER_QUESTION|SCHEMA|GUIDE|DB_RESULT_ANSWER)>/i.test(
+      line,
+    );
+  }
+
+  private isRawLikeAnswer(value: string): boolean {
+    const normalized = value.trim();
+
+    return (
+      /\bDB_RESULT\b|\bEXECUTED_SQL\b|<\/?[A-Z_]+>/i.test(normalized) ||
+      normalized.startsWith('{') ||
+      normalized.startsWith('[') ||
+      /^[A-Z0-9_-]+\s*\|\s*[^|]+/i.test(normalized)
+    );
+  }
+
+  private createNaturalAnswerFromQueryResult(
+    question: string,
+    queryResult: SqlGuideQueryResultDto,
+  ): string {
+    if (queryResult.rowCount === 0) {
+      return this.createFallbackAnswer(queryResult);
+    }
+
+    const [firstRow] = queryResult.rows;
+
+    if (!firstRow) {
+      return this.createFallbackAnswer(queryResult);
+    }
+
+    const identifier = this.resolveAnswerIdentifier(question, firstRow);
+    const valueColumns = this.getAnswerValueColumns(question, queryResult.columns, firstRow);
+
+    if (valueColumns.length === 0) {
+      return this.createFallbackAnswer(queryResult);
+    }
+
+    if (queryResult.rowCount > 1) {
+      return `조건에 맞는 데이터가 ${queryResult.rowCount.toLocaleString('ko-KR')}건 조회되었습니다.`;
+    }
+
+    const formattedValues = valueColumns
+      .slice(0, 3)
+      .map((column) => {
+        const label = COLUMN_LABEL_MAP[column] ?? column;
+        const value = this.formatAnswerCell(firstRow[column]);
+
+        return { label, value };
+      });
+
+    const subject = identifier ?? '조회된 법인';
+
+    if (formattedValues.length === 1) {
+      const [formattedValue] = formattedValues;
+
+      return `${subject}의 ${formattedValue.label}는 '${formattedValue.value}'입니다.`;
+    }
+
+    const summary = formattedValues
+      .map((formattedValue) => `${formattedValue.label} '${formattedValue.value}'`)
+      .join(', ');
+
+    return `${subject}의 조회 결과는 ${summary}입니다.`;
+  }
+
+  private resolveAnswerIdentifier(
+    question: string,
+    row: Record<string, string | number | boolean | null>,
+  ): string | null {
+    const questionCustId = question.match(/\bcust[_\s-]?id\s+([a-zA-Z0-9_-]+)/i)?.[1];
+    const questionMemId = question.match(/\bmem[_\s-]?id\s+([a-zA-Z0-9_-]+)/i)?.[1];
+
+    if (questionCustId) {
+      return `cust_id ${questionCustId}`;
+    }
+
+    if (questionMemId) {
+      return `mem_id ${questionMemId}`;
+    }
+
+    const rowIdColumn = ANSWER_ID_COLUMNS.find((column) => row[column] !== undefined);
+    const rowIdValue = rowIdColumn ? row[rowIdColumn] : null;
+
+    return rowIdColumn && rowIdValue !== null && rowIdValue !== undefined
+      ? `${rowIdColumn} ${String(rowIdValue)}`
+      : null;
+  }
+
+  private getAnswerValueColumns(
+    question: string,
+    columns: string[],
+    row: Record<string, string | number | boolean | null>,
+  ): string[] {
+    const availableColumns = columns.filter(
+      (column) => !ANSWER_ID_COLUMNS.includes(column) && row[column] !== undefined,
+    );
+    const requestedColumn = availableColumns.find((column) => {
+      const label = COLUMN_LABEL_MAP[column];
+
+      return question.includes(column) || Boolean(label && question.includes(label));
+    });
+
+    return requestedColumn ? [requestedColumn] : availableColumns;
+  }
+
+  private formatAnswerCell(value: string | number | boolean | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '-';
+    }
+
+    return String(value);
   }
 
   private createFallbackAnswer(queryResult: SqlGuideQueryResultDto): string {

@@ -87,4 +87,80 @@ describe('AiService', () => {
 
     expect(isSafeSelect).toBe(false);
   });
+
+  it('removes llama cli banner, echoed prompt, and exit text from answers', () => {
+    const { service } = createService(vi.fn());
+    const prompt = [
+      'You are a Korean corporate-data assistant.',
+      '<USER_QUESTION>',
+      'cust_id CUST000215인 법인의 계정상태 알려줘.',
+      '</USER_QUESTION>',
+      '<DB_RESULT>',
+      '{ "rows": [{ "account_status": "휴면계정" }] }',
+      '</DB_RESULT>',
+    ].join('\n');
+    const raw = [
+      'loading model...',
+      '',
+      '▄▄ ▄▄',
+      'build      : b10679-50f068fff',
+      'available commands:',
+      ' /exit or Ctrl+C     stop or exit',
+      '',
+      `> ${prompt}`,
+      '',
+      '해당 법인의 계정상태는 휴면계정입니다.',
+      '',
+      'Exiting...',
+    ].join('\n');
+
+    const cleaned = (
+      service as unknown as {
+        cleanLlamaOutput: (raw: string, prompt?: string) => string;
+      }
+    ).cleanLlamaOutput(raw, prompt);
+
+    expect(cleaned).toBe('해당 법인의 계정상태는 휴면계정입니다.');
+  });
+
+  it('converts raw-looking final answers to a natural Korean sentence from DB rows', () => {
+    const { service } = createService(vi.fn());
+
+    const answer = (
+      service as unknown as {
+        normalizeFinalAnswer: (
+          question: string,
+          finalAnswer: string,
+          queryResult: {
+            executed: boolean;
+            columns: string[];
+            executedSql: string | null;
+            rows: Record<string, string | number | boolean | null>[];
+            rowCount: number;
+            error: string | null;
+          },
+        ) => string;
+      }
+    ).normalizeFinalAnswer(
+      'cust_id CUST000215인 법인의 계정상태 알려줘.',
+      [
+        'DB_RESULT',
+        'CUST000215 | ACTIVE',
+        "<EXECUTED_SQL>",
+        "SELECT account_status FROM myy_corp_member_dim WHERE cust_id = 'CUST000215'",
+        '</EXECUTED_SQL>',
+      ].join('\n'),
+      {
+        executed: true,
+        columns: ['account_status'],
+        executedSql:
+          "SELECT account_status FROM myy_corp_member_dim WHERE cust_id = 'CUST000215'",
+        rows: [{ account_status: '휴면계정' }],
+        rowCount: 1,
+        error: null,
+      },
+    );
+
+    expect(answer).toBe("cust_id CUST000215의 계정상태는 '휴면계정'입니다.");
+  });
 });

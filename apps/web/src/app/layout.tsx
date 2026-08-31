@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Wearhouse Reports",
+  title: "Reports",
   description: "Corporate performance report dashboard",
 };
 
