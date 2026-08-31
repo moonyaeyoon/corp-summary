@@ -14,7 +14,7 @@ import { TransactionsModule } from './transactions/transactions.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: process.env.SERVER_ENV_PATH || '.env',
     }),
     AiModule,
     DatabaseModule,

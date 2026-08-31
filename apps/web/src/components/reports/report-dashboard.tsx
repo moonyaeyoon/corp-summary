@@ -428,7 +428,6 @@ function buildSqlGuideText(response: SqlGuideResponse): string {
       ? ["", "조회 결과:", JSON.stringify(response.queryResult.rows, null, 2)].join("\n")
       : "",
     response.usedTables.length > 0 ? ["", "사용 테이블:", response.usedTables.join(", ")].join("\n") : "",
-    response.cautions.length > 0 ? ["", "주의사항:", ...response.cautions.map((item) => `- ${item}`)].join("\n") : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -535,15 +534,6 @@ function QuestionsPanel({
               <div className="answer-meta">
                 <strong>사용 테이블</strong>
                 <span>{answer.usedTables.join(", ")}</span>
-              </div>
-            ) : null}
-            {answer.cautions.length > 0 || !answer.isSafeSelect ? (
-              <div className="answer-meta">
-                <strong>주의사항</strong>
-                {answer.isSafeSelect ? null : <span>생성된 SQL이 조회 전용인지 한 번 더 확인해 주세요.</span>}
-                {answer.cautions.map((caution) => (
-                  <span key={caution}>{caution}</span>
-                ))}
               </div>
             ) : null}
           </div>

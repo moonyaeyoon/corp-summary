@@ -1,0 +1,74 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Corp Summary desktop shell",
+  "author": "",
+  "main": "src/main.js",
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "swagger-ui-express": "^5.0.1",
+    "typeorm": "^0.3.31"
+  },
+  "scripts": {
+    "stage": "node scripts/stage.js",
+    "clean:web": "node scripts/clean-web-build.js",
+    "dev": "npm run build -w server && npm run clean:web && npm run build -w web && npm run stage && electron .",
+    "dist:mac": "npm run build -w server && npm run clean:web && npm run build -w web && npm run stage && electron-builder --mac dmg",
+    "dist:win": "npm run build -w server && npm run clean:web && npm run build -w web && npm run stage && electron-builder --win nsis portable",
+    "pack": "npm run build -w server && npm run clean:web && npm run build -w web && npm run stage && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.corpsummary.desktop",
+    "productName": "Corp Summary",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      ".bundle/web/**/*",
+      ".bundle/server/**/*",
+      ".bundle/desktop-manifest.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".bundle/bin",
+        "to": ".bundle/bin",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": ".bundle/models",
+        "to": ".bundle/models",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.business"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "41.7.1",
+    "electron-builder": "^24.13.3"
+  }
+}
